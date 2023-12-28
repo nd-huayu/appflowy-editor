@@ -41,6 +41,13 @@ and the Flutter guide for
   * toolbar menu
 * [Test Coverage](https://github.com/AppFlowy-IO/appflowy-editor/blob/main/documentation/testing.md) and ongoing maintenance by AppFlowy's core team and community of more than 1,000 builders
 
+Explanation: This extension Fork is from [AppFlowy](https://github.com/AppFlowy-IO/appflowy-editor) (1.4.4), and we have added the following features to it:
+
+* Support insert audio and video content, support playback control
+* Support editing synchronization, supporting connection to collaborative services and collaborative editing with other devices
+* Editing area scaling and word count etc.
+* Support for text formatting brushes, style extensions, font settings
+
 ## Getting Started
 
 Add the AppFlowy editor [Flutter package](https://docs.flutter.dev/development/packages-and-plugins/using-packages) to your environment.
