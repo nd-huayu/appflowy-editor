@@ -15,11 +15,11 @@ extension EditorCopyPaste on EditorState {
     final insertedDelta = insertedNode.delta;
     // if the node is empty, replace it with the inserted node.
     if (delta.isEmpty) {
+      transaction.deleteNode(node);
       transaction.insertNode(
         selection.end.path.next,
         insertedNode,
       );
-      transaction.deleteNode(node);
       final path = calculatePath(selection.end.path, [insertedNode]);
       final offset = calculateLength([insertedNode]);
       transaction.afterSelection = Selection.collapsed(

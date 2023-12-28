@@ -22,9 +22,10 @@ extension ColorExtension on String {
         final r = int.tryParse(match.group(1)!);
         final g = int.tryParse(match.group(2)!);
         final b = int.tryParse(match.group(3)!);
-        final a = double.tryParse(match.group(4)!);
+        final a = int.tryParse(match.group(4)!);
         if (r != null && g != null && b != null && a != null) {
-          return Color.fromARGB((a * 255).toInt(), r, g, b);
+          // return Color.fromARGB((a * 255).toInt(), r, g, b);
+          return Color.fromARGB(a, r, g, b);
         }
       }
     } else if (hexRegex.hasMatch(this)) {

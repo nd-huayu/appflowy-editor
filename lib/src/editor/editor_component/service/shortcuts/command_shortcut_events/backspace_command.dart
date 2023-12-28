@@ -47,7 +47,25 @@ CommandShortcutEventHandler _backspaceInCollapsedSelection = (editorState) {
   final transaction = editorState.transaction;
 
   // delete the entire node if the delta is empty
-  if (node.delta == null) {
+  if (node.delta == null || node.isMediaType()) {
+    // 剩1个的时候需要删除之后插入一个空节点
+    if (editorState.document.first == editorState.document.last) {
+      if (node.isMediaType()) {
+        editorState
+            .insertNewLine(position: position)
+            .then((value) {
+          transaction.deleteNode(node);
+          transaction.afterSelection = Selection.collapsed(
+            Position(
+              path: position.path,
+              offset: 0,
+            ),
+          );
+          editorState.apply(transaction);
+        });
+        return KeyEventResult.handled;
+      }
+    }
     transaction.deleteNode(node);
     transaction.afterSelection = Selection.collapsed(
       Position(
@@ -78,37 +96,44 @@ CommandShortcutEventHandler _backspaceInCollapsedSelection = (editorState) {
         ..afterSelection = Selection.collapsed(
           Position(
             path: path,
-            offset: 0,
+            offset: 0, 
           ),
         );
     } else {
-      Node? tableParent =
-          node.findParent((element) => element.type == TableBlockKeys.type);
-      Node? prevTableParent;
-      final prev = node.previousNodeWhere((element) {
-        prevTableParent = element
-            .findParent((element) => element.type == TableBlockKeys.type);
-        // break if only one is in a table or they're in different tables
-        return tableParent != prevTableParent ||
-            // merge with the previous node contains delta.
-            element.delta != null;
-      });
-      // table nodes should be deleted using the table menu
-      // in-table paragraphs should only be deleted inside the table
-      if (prev != null && tableParent == prevTableParent) {
-        assert(prev.delta != null);
+      // merge with the previous node contains delta.
+      final previousNodeWithDelta =
+          node.previousNodeWhere((element) => element.delta != null);
+      if (previousNodeWithDelta != null && previousNodeWithDelta.isMediaType()) {
+        // 退格时，如果前一个节点是媒体类型的，则直接删除该节点（因为目前还不支持多媒体环绕）
         transaction
-          ..mergeText(prev, node)
+            ..deleteNode(previousNodeWithDelta)
+            ..afterSelection = Selection.collapsed(
+              Position(
+                path: previousNodeWithDelta.path,
+                offset: 0,
+              ),
+            );
+      } else if (previousNodeWithDelta != null &&
+          previousNodeWithDelta.type != PageBlockKeys.type) {
+        assert(previousNodeWithDelta.delta != null);
+        transaction
+          ..mergeText(previousNodeWithDelta, node)
           ..insertNodes(
             // insert children to previous node
-            prev.path.next,
+            previousNodeWithDelta.path.next,
             node.children.toList(),
           )
-          ..deleteNode(node)
+          ..deleteNode(
+            previousNodeWithDelta.delta!.isEmpty
+                ? node.delta!.isEmpty
+                    ? node
+                    : previousNodeWithDelta
+                : node,
+          )
           ..afterSelection = Selection.collapsed(
             Position(
-              path: prev.path,
-              offset: prev.delta!.length,
+              path: previousNodeWithDelta.path,
+              offset: previousNodeWithDelta.delta!.length,
             ),
           );
       } else {

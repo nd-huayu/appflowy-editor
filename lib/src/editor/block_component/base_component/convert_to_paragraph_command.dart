@@ -6,7 +6,7 @@ final convertibleBlockTypes = [
   NumberedListBlockKeys.type,
   TodoListBlockKeys.type,
   QuoteBlockKeys.type,
-  HeadingBlockKeys.type,
+  // HeadingBlockKeys.type, //标题类的不用转换成paragraph
 ];
 
 /// Convert to paragraph command.
@@ -33,6 +33,11 @@ CommandShortcutEventHandler _convertToParagraphCommandHandler = (editorState) {
   if (node == null ||
       delta == null ||
       !convertibleBlockTypes.contains(node.type)) {
+    if (node != null) {
+      if (node.type == 'heading') {
+        editorState.headingChange = true;
+      }
+    }
     return KeyEventResult.ignored;
   }
   final index = delta.prevRunePosition(selection.startIndex);

@@ -2,11 +2,16 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/block_component/base_component/block_icon_builder.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tuple/tuple.dart';
+
+import '../base_component/text_align_mixin.dart';
 
 class NumberedListBlockKeys {
   const NumberedListBlockKeys._();
 
   static const String type = 'numbered_list';
+
+  static const String listType = 'numbered_list_type';
 
   static const String number = 'number';
 
@@ -93,7 +98,7 @@ class _NumberedListBlockComponentWidgetState
         BlockComponentBackgroundColorMixin,
         NestedBlockComponentStatefulWidgetMixin,
         BlockComponentTextDirectionMixin,
-        BlockComponentAlignMixin {
+        BlockComponentTextAlignMixin {
   @override
   final forwardKey = GlobalKey(debugLabel: 'flowy_rich_text');
 
@@ -119,14 +124,14 @@ class _NumberedListBlockComponentWidgetState
     final textDirection = calculateTextDirection(
       layoutDirection: Directionality.maybeOf(context),
     );
+    final textAlign = calculateTextAlign();
 
     Widget child = Container(
       color: withBackgroundColor ? backgroundColor : null,
       width: double.infinity,
-      alignment: alignment,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: calculateRowMainAxisAlignment(textAlign),
         mainAxisSize: MainAxisSize.min,
         textDirection: textDirection,
         children: [
@@ -143,7 +148,6 @@ class _NumberedListBlockComponentWidgetState
               delegate: this,
               node: widget.node,
               editorState: editorState,
-              textAlign: alignment?.toTextAlign,
               placeholderText: placeholderText,
               textSpanDecorator: (textSpan) => textSpan.updateTextStyle(
                 textStyle,
@@ -153,6 +157,7 @@ class _NumberedListBlockComponentWidgetState
                 placeholderTextStyle,
               ),
               textDirection: textDirection,
+              textAlign: textAlign,
               cursorColor: editorState.editorStyle.cursorColor,
               selectionColor: editorState.editorStyle.selectionColor,
             ),
@@ -206,15 +211,46 @@ class _NumberedListIcon extends StatelessWidget {
     final editorState = context.read<EditorState>();
     final text = editorState.editorStyle.textStyleConfiguration.text;
     final level = _NumberedListIconBuilder(node: node).level;
-    return Padding(
+    Tuple2 fontSize = editorState.getCurNodeMaxFontSize(node);
+    TextStyle style = text.combine(textStyle);
+    TextStyle strutStyle = text.combine(textStyle);
+
+    double lineHeight = 1.5;
+    if (node.attributes.containsKey(blockComponentTextHeight)) {
+      lineHeight = double.tryParse(
+            (node.attributes[blockComponentTextHeight]!).toString(),
+          ) ??
+          1;
+    }
+    style = style.merge(
+      TextStyle(
+        height: lineHeight - 0.1,
+        fontSize: fontSize.item1,
+        fontFamily: defaultFontFamilyFallback.first,
+        fontFamilyFallback: defaultFontFamilyFallback,
+      ),
+    );
+    strutStyle = strutStyle.merge(
+      TextStyle(
+        height: lineHeight - 0.1,
+        fontSize: fontSize.item2,
+        fontFamily: defaultFontFamilyFallback.first,
+        fontFamilyFallback: defaultFontFamilyFallback,
+      ),
+    );
+
+    return Container(
+      // color: Colors.red,
       padding: const EdgeInsets.only(right: 5.0),
       child: Text.rich(
         textHeightBehavior: const TextHeightBehavior(
           applyHeightToFirstAscent: false,
           applyHeightToLastDescent: false,
         ),
-        TextSpan(text: '$level.', style: text.combine(textStyle)),
+        TextSpan(text: '$level.', style: style),
         textDirection: direction,
+        style: style,
+        strutStyle: StrutStyle.fromTextStyle(strutStyle),
       ),
     );
   }

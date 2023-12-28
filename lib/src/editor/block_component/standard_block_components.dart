@@ -78,8 +78,8 @@ final List<CharacterShortcutEvent> standardCharacterShortcutEvents = [
   formatFilledBracketsToCheckedBox,
   formatHyphenFilledBracketsToCheckedBox,
 
-  // slash
-  slashCommand,
+  // slash "/"出现的面板
+  if (isCoverAll) slashCommand,
 
   // divider
   convertMinusesToDivider,

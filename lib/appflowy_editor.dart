@@ -28,3 +28,14 @@ export 'src/service/context_menu/context_menu.dart';
 export 'src/service/internal_key_event_handlers/copy_paste_handler.dart';
 export 'src/service/shortcut_event/key_mapping.dart';
 export 'src/service/shortcut_event/keybinding.dart';
+// autosync
+export 'src/sync/IDocCooperativeApi.dart';
+export 'src/sync/NdOnlineController.dart';
+export 'src/sync/business/route_message_handler.dart';
+export 'src/sync/business/editing_state_message_handler.dart';
+export 'src/sync/business/message_type.dart';
+// components
+export '/src/editor/block_component/media_block_component/video_block_component.dart';
+export '/src/editor/block_component/media_block_component/audio_block_component.dart';
+// extension
+export '/src/extensions/insert_extension.dart';

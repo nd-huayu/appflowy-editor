@@ -1,9 +1,10 @@
-import 'dart:collection';
-
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:collection/collection.dart';
+import 'package:autosync/autosync.dart';
 import 'package:flutter/material.dart';
 import 'package:nanoid/non_secure.dart';
+part 'node_sync_mixin.dart';
+part 'node_editing_mixin.dart';
 
 abstract class NodeExternalValues {
   const NodeExternalValues();
@@ -26,41 +27,68 @@ abstract class NodeExternalValues {
 /// }
 /// ```
 ///
-final class Node extends ChangeNotifier with LinkedListEntry<Node> {
+
+final class Node extends ChangeNotifier
+    with SyncNode, NodeSyncMixin, NodeEditingMixin {
   Node({
     required this.type,
     String? id,
-    this.parent,
+    Node? parent,
     Attributes attributes = const {},
     Iterable<Node> children = const [],
-  })  : _children = LinkedList<Node>()
+  })  : _children = SyncRxList<Node>.empty(name: '_children')
           ..addAll(
             children.map(
               (e) => e..unlink(),
             ),
           ), // unlink the given children to avoid the error of "node has already a parent"
-        _attributes = attributes,
+        _attributes = SyncRxMap<String, dynamic>.from(attributes),
         id = id ?? nanoid(6) {
+    _parent = parent;
     for (final child in children) {
       child.parent = this;
+      child.syncNodeParent = _children;
+    }
+    _children.syncNodeParent = this;
+  }
+
+  Node.fromSyncNode({
+    required this.type,
+    String? id,
+    Node? parent,
+    SyncRxMap<String, dynamic>? attributes,
+    SyncRxList<Node>? children,
+  }) : id = id ?? nanoid(6) {
+    _parent = parent;
+    children?.forEach((element) => element.unlink);
+    _children = children ?? SyncRxList<Node>();
+    _attributes = attributes ?? SyncRxMap<String, dynamic>();
+    _children.syncNodeParent = this;
+    _attributes.syncNodeParent = this;
+    for (final child in _children) {
+      child.parent = this;
+      child.syncNodeParent = _children;
     }
   }
 
   /// Parses a [Map] into a [Node]
   ///
-  factory Node.fromJson(Map<String, Object> json) {
-    final node = Node(
-      type: json['type'] as String,
-      attributes: Attributes.from(json['data'] as Map? ?? {}),
-      children: (json['children'] as List? ?? [])
-          .map((e) => Map<String, Object>.from(e))
-          .map((e) => Node.fromJson(e)),
-    );
+  factory Node.fromJson(Map<String, dynamic> json) {
+    final astype = json['astype'] as String? ?? 'Node';
+    final syncId = json['id'];
+    final rev = json['rev'] ?? 0;
 
-    for (final child in node.children) {
-      child.parent = node;
-    }
-
+    final type = json['type'] as String;
+    final children = getValue<SyncRxList<Node>?, Node>(json['children']);
+    final attributes =
+        SyncRxMap<String, dynamic>.from(json['attributes'] ?? {});
+    final node = Node.fromSyncNode(
+      type: type,
+      attributes: attributes,
+      children: children,
+    )
+      ..rev = rev
+      ..syncNodeId = syncId;
     return node;
   }
 
@@ -77,19 +105,24 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
   // String get id => type;
 
   /// The parent of the node.
-  Node? parent;
+  Node? _parent;
+
+  Node? get parent => _parent ?? getSafeParentNode();
+  set parent(Node? parent) => _parent = parent;
 
   /// The children of the node.
-  final LinkedList<Node> _children;
+  late final SyncRxList<Node> _children;
+  SyncRxList<Node> get syncChildren => _children;
   List<Node> get children {
-    _cacheChildren ??= _children.toList(growable: false);
-    return _cacheChildren!;
+    return _children;
+    // _cacheChildren ??= _children.toList(growable: false);
+    // return _cacheChildren!;
   }
 
-  List<Node>? _cacheChildren;
+  // List<Node>? _cacheChildren;
 
   /// The attributes of the node.
-  Attributes _attributes;
+  late SyncRxMap<String, dynamic> _attributes;
   Attributes get attributes => {..._attributes};
 
   /// The path of the node.
@@ -101,6 +134,9 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
   final key = GlobalKey();
   final layerLink = LayerLink();
 
+  // 预设的属性值
+  Attributes? toggleAttributes;
+
   void notify() {
     notifyListeners();
   }
@@ -108,8 +144,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
   /// Update the attributes of the node.
   ///
   void updateAttributes(Attributes attributes) {
-    _attributes = composeAttributes(this.attributes, attributes) ?? {};
-
+    this.attributes = composeAttributes(this.attributes, attributes) ?? {};
     notifyListeners();
   }
 
@@ -148,7 +183,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     entry._resetRelationshipIfNeeded();
     entry.parent = this;
 
-    _cacheChildren = null;
+    // _cacheChildren = null;
 
     if (_children.isEmpty) {
       _children.add(entry);
@@ -160,12 +195,13 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     // If index is negative, insert at the beginning.
     // If index is positive, insert at the index.
     if (index >= length) {
-      _children.last.insertAfter(entry);
+      _children.add(entry);
     } else if (index <= 0) {
-      _children.first.insertBefore(entry);
+      _children.insert(0, entry);
     } else {
-      childAtIndexOrNull(index)?.insertBefore(entry);
+      _children.insert(index, entry);
     }
+    notifyListeners();
   }
 
   @override
@@ -173,7 +209,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     entry.parent = parent;
     super.insertAfter(entry);
 
-    parent?._cacheChildren = null;
+    // parent?._cacheChildren = null;
 
     // Notifies the new node.
     parent?.notifyListeners();
@@ -184,7 +220,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     entry.parent = parent;
     super.insertBefore(entry);
 
-    parent?._cacheChildren = null;
+    // parent?._cacheChildren = null;
 
     // Notifies the new node.
     parent?.notifyListeners();
@@ -198,7 +234,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     Log.editor.debug('delete Node $this from path $path');
     super.unlink();
 
-    parent?._cacheChildren = null;
+    // parent?._cacheChildren = null;
 
     parent?.notifyListeners();
     parent = null;
@@ -210,7 +246,7 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
   // otherwise, it will throw a state error
   //  'Bad state: LinkedNode is already in a LinkedList'
   void _resetRelationshipIfNeeded() {
-    if (parent != null || list != null) {
+    if (parent != null /*|| list != null*/) {
       unlink();
     }
   }
@@ -228,23 +264,21 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
     if (attributes['delta'] is List) {
       return Delta.fromJson(attributes['delta']);
     }
-    return null;
+    return Delta();
   }
 
   Map<String, Object> toJson() {
     final map = <String, Object>{
       'type': type,
+      'id': syncNodeId,
+      'rev': rev,
+      'astype': 'Node',
     };
-    if (children.isNotEmpty) {
-      map['children'] = children
-          .map(
-            (node) => node.toJson(),
-          )
-          .toList(growable: false);
-    }
-    if (attributes.isNotEmpty) {
+    map['children'] = getIdOrValue(_children)!;
+    if (_attributes.isNotEmpty) {
       // filter the null value
-      map['data'] = attributes..removeWhere((_, value) => value == null);
+      // map['data'] = attributes..removeWhere((_, value) => value == null);
+      map['attributes'] = getIdOrValue(_attributes)!;
     }
     return map;
   }
@@ -267,12 +301,11 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
         );
       }
     }
-    node.externalValues = externalValues;
     return node;
   }
 
   Path _computePath([Path previous = const []]) {
-    final parent = this.parent;
+    final parent = getSafeParentNode();
     if (parent == null) {
       return previous;
     }
@@ -303,6 +336,8 @@ final class Node extends ChangeNotifier with LinkedListEntry<Node> {
       child.checkDocumentIntegrity();
     }
   }
+
+  bool isMediaType() => type ==  ImageBlockKeys.type || type == AudioBlockKeys.type || type == VideoBlockKeys.type;
 }
 
 @Deprecated('Use Paragraph instead')

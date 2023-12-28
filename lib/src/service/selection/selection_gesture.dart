@@ -11,6 +11,7 @@ class SelectionGestureDetector extends StatefulWidget {
     Key? key,
     this.child,
     this.onTapDown,
+    this.onTapUp,
     this.onDoubleTapDown,
     this.onTripleTapDown,
     this.onSecondaryTapDown,
@@ -26,6 +27,7 @@ class SelectionGestureDetector extends StatefulWidget {
   final Widget? child;
 
   final GestureTapDownCallback? onTapDown;
+  final GestureTapUpCallback? onTapUp;
   final GestureTapDownCallback? onDoubleTapDown;
   final GestureTapDownCallback? onTripleTapDown;
   final GestureTapDownCallback? onSecondaryTapDown;
@@ -70,6 +72,7 @@ class SelectionGestureDetectorState extends State<SelectionGestureDetector> {
             GestureRecognizerFactoryWithHandlers<TapGestureRecognizer>(
           () => TapGestureRecognizer(),
           (recognizer) {
+            recognizer.onTapUp = _tapUpDelegate;
             recognizer.onTapDown = _tapDownDelegate;
             recognizer.onSecondaryTapDown = widget.onSecondaryTapDown;
           },
@@ -77,6 +80,12 @@ class SelectionGestureDetectorState extends State<SelectionGestureDetector> {
       },
       child: widget.child,
     );
+  }
+
+  void _tapUpDelegate(TapUpDetails tapUpDetails) {
+    if (widget.onTapUp != null) {
+      widget.onTapUp!(tapUpDetails);
+    }
   }
 
   void _tapDownDelegate(TapDownDetails tapDownDetails) {

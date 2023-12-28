@@ -20,6 +20,8 @@ class BuiltInAttributeKey {
   static String highlightColor = 'highlightColor';
   static String code = 'code';
   static String href = 'href';
+  static String fontSize = 'fontSize';
+  static String fontFamily = 'fontFamily';
 
   static String subtype = 'subtype';
   static String heading = 'heading';
@@ -35,6 +37,7 @@ class BuiltInAttributeKey {
   static String numberList = 'number-list';
   static String quote = 'quote';
   static String number = 'number';
+  static String align = 'align';
 
   static List<String> partialStyleKeys = [
     BuiltInAttributeKey.bold,
@@ -45,6 +48,8 @@ class BuiltInAttributeKey {
     BuiltInAttributeKey.textColor,
     BuiltInAttributeKey.href,
     BuiltInAttributeKey.code,
+    BuiltInAttributeKey.fontSize,
+    BuiltInAttributeKey.fontFamily,
   ];
 
   static List<String> globalStyleKeys = [
@@ -54,5 +59,6 @@ class BuiltInAttributeKey {
     BuiltInAttributeKey.bulletedList,
     BuiltInAttributeKey.numberList,
     BuiltInAttributeKey.quote,
+    BuiltInAttributeKey.align,
   ];
 }

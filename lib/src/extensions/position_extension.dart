@@ -76,18 +76,26 @@ extension PositionExtension on Position {
     Offset offset;
     if (selection.isBackward) {
       final rect = rects.reduce(
-        (current, next) => current.bottom >= next.bottom ? current : next,
+            (current, next) => current.bottom >= next.bottom ? current : next,
       );
       offset = upwards
           ? rect.topRight.translate(0, -rect.height)
           : rect.centerRight.translate(0, rect.height);
     } else {
-      final rect = rects.reduce(
-        (current, next) => current.top <= next.top ? current : next,
+      Rect rect = rects.reduce(
+            (current, next) => current.top <= next.top ? current : next,
+      );
+      double offs = 9 * editorState.curCanvasScale;
+      // 受缩放倍率影响，这里要乘以相应倍数
+      rect = Rect.fromLTWH(
+        rect.left,
+        rect.top,
+        rect.width * editorState.curCanvasScale,
+        rect.height * editorState.curCanvasScale,
       );
       offset = upwards
-          ? rect.topLeft.translate(0, -rect.height)
-          : rect.centerLeft.translate(0, rect.height);
+          ? rect.topLeft.translate(0, -offs)
+          : rect.bottomLeft.translate(0, offs);
     }
 
     return editorState.service.selectionService.getPositionInOffset(offset);

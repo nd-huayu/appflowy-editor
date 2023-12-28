@@ -1,23 +1,32 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/block_component/base_component/block_icon_builder.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:tuple/tuple.dart';
+
+import '../base_component/text_align_mixin.dart';
 
 class BulletedListBlockKeys {
   const BulletedListBlockKeys._();
 
   static const String type = 'bulleted_list';
 
+  static const String listType = 'bulleted_list_type';
+
   static const String delta = blockComponentDelta;
 
   static const String backgroundColor = blockComponentBackgroundColor;
 
   static const String textDirection = blockComponentTextDirection;
+
+  static const String textAlign = blockComponentTextAlign;
 }
 
 Node bulletedListNode({
   String? text,
   Delta? delta,
   String? textDirection,
+  String? textAlign,
   Attributes? attributes,
   Iterable<Node>? children,
 }) {
@@ -29,6 +38,7 @@ Node bulletedListNode({
       if (attributes != null) ...attributes,
       if (textDirection != null)
         BulletedListBlockKeys.textDirection: textDirection,
+      if (textAlign != null) BulletedListBlockKeys.textAlign: textAlign,
     },
     children: children ?? [],
   );
@@ -88,7 +98,7 @@ class _BulletedListBlockComponentWidgetState
         BlockComponentBackgroundColorMixin,
         NestedBlockComponentStatefulWidgetMixin,
         BlockComponentTextDirectionMixin,
-        BlockComponentAlignMixin {
+        BlockComponentTextAlignMixin {
   @override
   final forwardKey = GlobalKey(debugLabel: 'flowy_rich_text');
 
@@ -115,13 +125,13 @@ class _BulletedListBlockComponentWidgetState
       layoutDirection: Directionality.maybeOf(context),
     );
 
+    final textAlign = calculateTextAlign();
     Widget child = Container(
       color: withBackgroundColor ? backgroundColor : null,
       width: double.infinity,
-      alignment: alignment,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: calculateRowMainAxisAlignment(textAlign),
         mainAxisSize: MainAxisSize.min,
         textDirection: textDirection,
         children: [
@@ -137,7 +147,6 @@ class _BulletedListBlockComponentWidgetState
               delegate: this,
               node: widget.node,
               editorState: editorState,
-              textAlign: alignment?.toTextAlign,
               placeholderText: placeholderText,
               textSpanDecorator: (textSpan) => textSpan.updateTextStyle(
                 textStyle,
@@ -147,6 +156,7 @@ class _BulletedListBlockComponentWidgetState
                 placeholderTextStyle,
               ),
               textDirection: textDirection,
+              textAlign: textAlign,
               cursorColor: editorState.editorStyle.cursorColor,
               selectionColor: editorState.editorStyle.selectionColor,
             ),
@@ -215,18 +225,46 @@ class _BulletedListIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 22,
-      height: 22,
-      child: Padding(
-        padding: const EdgeInsets.only(right: 5.0),
-        child: Center(
-          child: Text(
-            icon,
-            style: textStyle,
-            textScaleFactor: 0.5,
-          ),
+    final editorState = context.read<EditorState>();
+    Tuple2 fontSize = editorState.getCurNodeMaxFontSize(node);
+    TextStyle targetStyle = textStyle;
+    TextStyle targetStrutStyle = textStyle;
+
+    double lineHeight = 1.5;
+    if (node.attributes.containsKey(blockComponentTextHeight)) {
+      lineHeight = double.tryParse(
+            (node.attributes[blockComponentTextHeight]!).toString(),
+          ) ??
+          1;
+    }
+    targetStyle = targetStyle.merge(
+      TextStyle(
+        height: lineHeight - 0.2,
+        fontSize: fontSize.item1 * 0.5,
+        fontFamily: defaultFontFamilyFallback.first,
+        fontFamilyFallback: defaultFontFamilyFallback,
+      ),
+    );
+    targetStrutStyle = targetStrutStyle.merge(
+      TextStyle(
+        height: lineHeight - 0.2,
+        fontSize: fontSize.item2,
+        fontFamily: defaultFontFamilyFallback.first,
+        fontFamilyFallback: defaultFontFamilyFallback,
+      ),
+    );
+
+    return Container(
+      // color: Colors.red,
+      padding: const EdgeInsets.only(right: 5.0),
+      child: Text.rich(
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
         ),
+        TextSpan(text: icon, style: targetStyle),
+        style: targetStyle,
+        strutStyle: StrutStyle.fromTextStyle(targetStrutStyle),
       ),
     );
   }

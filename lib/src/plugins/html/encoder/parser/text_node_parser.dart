@@ -31,8 +31,11 @@ class HTMLTextNodeParser extends HTMLNodeParser {
       ),
     );
 
-    final element =
-        wrapChildrenNodesWithTagName(HTMLTags.paragraph, childNodes: domNodes);
+    final element = wrapChildrenNodesWithTagName(
+      HTMLTags.paragraph,
+      childNodes: domNodes,
+      attributes: node.attributes,
+    );
     return [element];
   }
 }

@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/flutter/overlay.dart';
+
 import 'package:appflowy_editor/src/service/selection/selection_gesture.dart';
 import 'package:flutter/material.dart' hide Overlay, OverlayEntry;
 import 'package:flutter/services.dart';
@@ -72,7 +73,11 @@ class _DesktopSelectionServiceWidgetState
       Debounce.debounce(
         'didChangeMetrics - update selection ',
         const Duration(milliseconds: 100),
-        () => updateSelection(currentSelection.value!),
+        () {
+          if (currentSelection.value != null) {
+            updateSelection(currentSelection.value!);
+          }
+        },
       );
     }
   }
@@ -93,6 +98,7 @@ class _DesktopSelectionServiceWidgetState
       onPanUpdate: _onPanUpdate,
       onPanEnd: _onPanEnd,
       onTapDown: _onTapDown,
+      onTapUp: _onTapUp,
       onSecondaryTapDown: _onSecondaryTapDown,
       onDoubleTapDown: _onDoubleTapDown,
       onTripleTapDown: _onTripleTapDown,
@@ -232,6 +238,11 @@ class _DesktopSelectionServiceWidgetState
     updateSelection(selection);
   }
 
+  /// 抬起
+  void _onTapUp(TapUpDetails details) {
+    editorState.onTapUpCallback?.call(details);
+  }
+
   void _onDoubleTapDown(TapDownDetails details) {
     final offset = details.globalPosition;
     final node = getNodeInOffset(offset);
@@ -269,7 +280,8 @@ class _DesktopSelectionServiceWidgetState
       _onDoubleTapDown(details);
     }
 
-    _showContextMenu(details);
+    /// 暂时屏蔽右键弹出框
+    // _showContextMenu(details);
   }
 
   void _onPanStart(DragStartDetails details) {
@@ -313,7 +325,9 @@ class _DesktopSelectionServiceWidgetState
     );
   }
 
+  /// 选区结束
   void _onPanEnd(DragEndDetails details) {
+    editorState.onPanEndCallback?.call(details);
     _panStartPosition = null;
 
     editorState.service.scrollService?.stopAutoScroll();
@@ -386,8 +400,9 @@ class _DesktopSelectionServiceWidgetState
       (rect) => rect.bottom <= offset.dy,
     );
 
+    double minBottom = sortedNodes[min].rect.bottom;
     final filteredNodes = List.of(sortedNodes)
-      ..retainWhere((n) => n.rect.bottom == sortedNodes[min].rect.bottom);
+      ..retainWhere((n) => n.rect.bottom == minBottom);
     min = 0;
     if (filteredNodes.length > 1) {
       min = _findCloseNode(
@@ -429,7 +444,14 @@ class _DesktopSelectionServiceWidgetState
     var max = end;
     while (min <= max) {
       final mid = min + ((max - min) >> 1);
-      final rect = sortedNodes[mid].rect;
+      Rect rect = sortedNodes[mid].rect;
+      // 受缩放倍率影响，这里要乘以相应倍数
+      rect = Rect.fromLTWH(
+        rect.left,
+        rect.top,
+        rect.width * editorState.curCanvasScale,
+        rect.height * editorState.curCanvasScale,
+      );
       if (compare(rect)) {
         min = mid + 1;
       } else {

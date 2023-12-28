@@ -1,4 +1,5 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Copy.
@@ -29,6 +30,10 @@ CommandShortcutEventHandler _copyCommandHandler = (editorState) {
   );
   final document = Document.blank()..insert([0], nodes);
   final html = documentToHTML(document);
+
+  if(kDebugMode){
+    // print('copy ${html}');
+  }
 
   () async {
     await AppFlowyClipboard.setData(

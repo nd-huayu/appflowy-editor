@@ -272,3 +272,22 @@ Operation? transformOperation(Operation a, Operation b) {
   // TODO: transform update and textedit
   return b;
 }
+
+class UndoDiffOperation extends Operation {
+  UndoDiffOperation(super.path);
+
+  @override
+  Operation copyWith({Path? path}) {
+    return UndoDiffOperation([]);
+  }
+
+  @override
+  Operation invert() {
+    return UndoDiffOperation([]);
+  }
+
+  @override
+  Map<String, dynamic> toJson() {
+    return {};
+  }
+}

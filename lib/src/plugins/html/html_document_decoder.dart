@@ -74,6 +74,8 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
         return _parseHeadingElement(element, level: 2);
       case HTMLTags.h3:
         return _parseHeadingElement(element, level: 3);
+      case HTMLTags.h4:
+        return _parseHeadingElement(element, level: 4);
       case HTMLTags.unorderedList:
         return _parseUnOrderListElement(element);
       case HTMLTags.orderedList:
@@ -91,6 +93,10 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
         return [_parseBlockQuoteElement(element)];
       case HTMLTags.image:
         return [_parseImageElement(element)];
+      case HTMLTags.audio:
+        return [_parseAudioElement(element)];
+      case HTMLTags.video:
+        return [_parseVideoElement(element)];
       default:
         return _parseParagraphElement(element);
     }
@@ -142,24 +148,71 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
     return attributes;
   }
 
+  void _parseBlockAttributes(Attributes attributes, dom.Element element) {
+    final style = element.attributes['style'];
+    final css = _getCssFromString(style);
+    // align
+    final align = css[blockComponentTextAlign];
+    if (align != null) {
+      attributes.addAll({blockComponentTextAlign: align});
+    }
+    // lineHeight
+    final lineHeight = css[blockComponentTextHeight];
+    if (lineHeight != null) {
+      attributes.addAll({blockComponentTextHeight: lineHeight});
+    }
+    // indent
+    final indent = css[blockIndent];
+    if (indent != null) {
+      attributes.addAll({blockIndent: int.parse(indent.toString())});
+    }
+    // pre_paragraph
+    final preParagraph = css[blockPreParagraph];
+    if (preParagraph != null) {
+      attributes
+          .addAll({blockPreParagraph: double.parse(preParagraph.toString())});
+    }
+    // after_paragraph
+    final afterParagraph = css[blockAfterParagraph];
+    if (afterParagraph != null) {
+      attributes.addAll(
+          {blockAfterParagraph: double.parse(afterParagraph.toString())});
+    }
+  }
+
   Iterable<Node> _parseHeadingElement(
     dom.Element element, {
     required int level,
   }) {
     final (delta, specialNodes) = _parseDeltaElement(element);
+    Attributes attributes = {
+      'delta': (delta).toJson(),
+    };
+    if (element.attributes.isNotEmpty) {
+      _parseBlockAttributes(attributes, element);
+    }
+
     return [
       headingNode(
         level: level,
-        delta: delta,
+        // delta: delta,
+        attributes: attributes,
       ),
-      ...specialNodes,
+      ...specialNodes
     ];
   }
 
   Node _parseBlockQuoteElement(dom.Element element) {
     final (delta, nodes) = _parseDeltaElement(element);
+    Attributes attributes = {
+      'delta': (delta).toJson(),
+    };
+    if (element.attributes.isNotEmpty) {
+      _parseBlockAttributes(attributes, element);
+    }
     return quoteNode(
-      delta: delta,
+      // delta: delta,
+      attributes: attributes,
       children: nodes,
     );
   }
@@ -185,16 +238,34 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
     required String type,
   }) {
     final (delta, node) = _parseDeltaElement(element, type: type);
+    Attributes attributes = {
+      ParagraphBlockKeys.delta: delta.toJson(),
+    };
+    if (element.attributes.isNotEmpty) {
+      _parseBlockAttributes(attributes, element);
+    }
     return Node(
       type: type,
       children: node,
-      attributes: {ParagraphBlockKeys.delta: delta.toJson()},
+      attributes: attributes,
     );
   }
 
   Iterable<Node> _parseParagraphElement(dom.Element element) {
     final (delta, specialNodes) = _parseDeltaElement(element);
-    return [paragraphNode(delta: delta), ...specialNodes];
+    Attributes attributes = {
+      ParagraphBlockKeys.delta: delta.toJson(),
+    };
+    if (element.attributes.isNotEmpty) {
+      _parseBlockAttributes(attributes, element);
+    }
+    return [
+      paragraphNode(
+        // delta: delta,
+        attributes: attributes,
+      ),
+      ...specialNodes
+    ];
   }
 
   Node _parseImageElement(dom.Element element) {
@@ -204,7 +275,35 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
     }
     // only support network image
     return imageNode(
-      url: src,
+      url: src
+    );
+  }
+
+  Node _parseAudioElement(dom.Element element) {
+    final url = element.attributes['url'];
+    if (url == null || url.isEmpty || !url.startsWith('http')) {
+      return paragraphNode(); // return empty paragraph
+    }
+    return audioNode(
+      url: url,
+      autoPlay:
+          element.attributes[AudioBlockKeys.autoPlay]?.toLowerCase() == 'true',
+      isLoop:
+          element.attributes[AudioBlockKeys.isLoop]?.toLowerCase() == 'true',
+    );
+  }
+
+  Node _parseVideoElement(dom.Element element) {
+    final url = element.attributes['url'];
+    if (url == null || url.isEmpty || !url.startsWith('http')) {
+      return paragraphNode(); // return empty paragraph
+    }
+    return videoNode(
+      url: url,
+      autoPlay:
+          element.attributes[VideoBlockKeys.autoPlay]?.toLowerCase() == 'true',
+      isLoop:
+          element.attributes[VideoBlockKeys.isLoop]?.toLowerCase() == 'true',
     );
   }
 
@@ -284,6 +383,21 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
       }
     }
 
+    // font size
+    String? fontSize = css['font-size'];
+    if (fontSize != null) {
+      if (fontSize.endsWith('px')) {
+        fontSize = fontSize.substring(0, fontSize.length - 2);
+      }
+      attributes[AppFlowyRichTextKeys.fontSize] = double.parse(fontSize);
+    }
+
+    // font family
+    String? fontFamily = css['font-family'];
+    if (fontFamily != null) {
+      attributes[AppFlowyRichTextKeys.fontFamily] = fontFamily;
+    }
+
     // background color
     final backgroundColor = css['background-color'];
     if (backgroundColor != null) {
@@ -317,6 +431,14 @@ class DocumentHTMLDecoder extends Converter<String, Document> {
       attributes[AppFlowyRichTextKeys.italic] = true;
     }
 
+    // superscript
+    final superScript = css['super-script'];
+    if (superScript == 'superScript') {
+      attributes[AppFlowyRichTextKeys.superScript] = true;
+    } else if (superScript == 'subScript') {
+      attributes[AppFlowyRichTextKeys.subScript] = true;
+    }
+
     return attributes.isEmpty ? null : attributes;
   }
 
@@ -341,17 +463,24 @@ class HTMLTags {
   static const h1 = 'h1';
   static const h2 = 'h2';
   static const h3 = 'h3';
+  static const h4 = 'h4';
   static const orderedList = 'ol';
   static const unorderedList = 'ul';
   static const list = 'li';
   static const paragraph = 'p';
   static const image = 'img';
+  static const audio = 'audio';
+  static const video = 'video';
   static const anchor = 'a';
   static const italic = 'i';
   static const em = 'em';
   static const bold = 'b';
   static const underline = 'u';
   static const strikethrough = 's';
+  static const fontSize = 'font-size';
+  static const fontFamily = 'font-family';
+  static const fontColor = 'color';
+  static const bgColor = 'background-color';
   static const del = 'del';
   static const strong = 'strong';
   static const checkbox = 'input';
@@ -363,6 +492,9 @@ class HTMLTags {
   static const section = 'section';
   static const font = 'font';
   static const mark = 'mark';
+  static const align = 'align';
+  static const superScript = 'sup';
+  static const subScript = 'sub';
 
   static List<String> formattingElements = [
     HTMLTags.anchor,
@@ -370,6 +502,10 @@ class HTMLTags {
     HTMLTags.em,
     HTMLTags.bold,
     HTMLTags.underline,
+    HTMLTags.fontSize,
+    HTMLTags.fontFamily,
+    HTMLTags.fontColor,
+    HTMLTags.bgColor,
     HTMLTags.del,
     HTMLTags.strong,
     HTMLTags.span,
@@ -377,12 +513,15 @@ class HTMLTags {
     HTMLTags.strikethrough,
     HTMLTags.font,
     HTMLTags.mark,
+    HTMLTags.superScript,
+    HTMLTags.subScript,
   ];
 
   static List<String> specialElements = [
     HTMLTags.h1,
     HTMLTags.h2,
     HTMLTags.h3,
+    HTMLTags.h4,
     HTMLTags.unorderedList,
     HTMLTags.orderedList,
     HTMLTags.div,
@@ -391,6 +530,9 @@ class HTMLTags {
     HTMLTags.blockQuote,
     HTMLTags.checkbox,
     HTMLTags.image,
+    HTMLTags.audio,
+    HTMLTags.video,
+    HTMLTags.align,
     HTMLTags.section,
   ];
 
@@ -398,6 +540,7 @@ class HTMLTags {
     return tag == h1 ||
         tag == h2 ||
         tag == h3 ||
+        tag == h4 ||
         tag == checkbox ||
         tag == paragraph ||
         tag == div ||

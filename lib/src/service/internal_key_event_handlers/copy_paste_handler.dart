@@ -175,8 +175,8 @@ void _pasteSingleLineInText(
   }
   final insertedDelta = insertedNode.delta;
   if (delta.isEmpty || insertedDelta == null) {
-    transaction.insertNode(selection.end.path.next, insertedNode);
     transaction.deleteNode(node);
+    transaction.insertNode(selection.end.path, insertedNode);
     final length = insertedNode.delta?.length ?? 0;
     transaction.afterSelection =
         Selection.collapsed(Position(path: selection.end.path, offset: length));

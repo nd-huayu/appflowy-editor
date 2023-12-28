@@ -28,21 +28,35 @@ class ImageBlockKeys {
   ///
   /// The value is a double.
   static const String height = 'height';
+
+  /// The degree of a image block.
+  ///
+  /// The value is a double.
+  static const String degree = 'degree'; //角度
+
+  /// The isShadow of a image block.
+  ///
+  /// The value is a bool.
+  static const String isShadow = 'isshadow'; //是否有阴影
 }
 
 Node imageNode({
   required String url,
   String align = 'center',
+  double? degree,
   double? height,
   double? width,
+  bool? isShadow,
 }) {
   return Node(
     type: ImageBlockKeys.type,
     attributes: {
       ImageBlockKeys.url: url,
       ImageBlockKeys.align: align,
+      ImageBlockKeys.degree: degree,
       ImageBlockKeys.height: height,
       ImageBlockKeys.width: width,
+      ImageBlockKeys.isShadow: isShadow,
     },
   );
 }
@@ -83,7 +97,7 @@ class ImageBlockComponentBuilder extends BlockComponentBuilder {
   }
 
   @override
-  bool validate(Node node) => node.delta == null && node.children.isEmpty;
+  bool validate(Node node) => node.children.isEmpty;
 }
 
 class ImageBlockComponentWidget extends BlockComponentStatefulWidget {
@@ -116,31 +130,56 @@ class ImageBlockComponentWidgetState extends State<ImageBlockComponentWidget>
   Node get node => widget.node;
 
   final imageKey = GlobalKey();
+
   RenderBox? get _renderBox => context.findRenderObject() as RenderBox?;
 
   late final editorState = Provider.of<EditorState>(context, listen: false);
 
   final showActionsNotifier = ValueNotifier<bool>(false);
+  final showBoarderNotifier = ValueNotifier<bool>(false);
 
   bool alwaysShowMenu = false;
+
+  @override
+  void initState() {
+    editorState.selectionNotifier.addListener(_inSelectNode);
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    editorState.selectionNotifier.removeListener(_inSelectNode);
+    super.dispose();
+  }
+
+  void _inSelectNode() {
+    final selection = editorState.selectionNotifier.value?.normalized;
+    final path = widget.node.path;
+    showBoarderNotifier.value = path.inSelection(selection);
+  }
 
   @override
   Widget build(BuildContext context) {
     final node = widget.node;
     final attributes = node.attributes;
     final src = attributes[ImageBlockKeys.url];
+    final degree = attributes[ImageBlockKeys.degree] ?? 0;
+    final isShadow = attributes[ImageBlockKeys.isShadow] ?? false;
 
     final alignment = AlignmentExtension.fromString(
       attributes[ImageBlockKeys.align] ?? 'center',
     );
-    final width = attributes[ImageBlockKeys.width]?.toDouble() ??
-        MediaQuery.of(context).size.width;
+    final width = attributes[ImageBlockKeys.width]?.toDouble() ?? 600;
     final height = attributes[ImageBlockKeys.height]?.toDouble();
 
     Widget child = ResizableImage(
+      nodeBoardColor: editorState.editorStyle.cursorColor,
+      listenable: showBoarderNotifier,
       src: src,
       width: width,
       height: height,
+      degree: degree,
+      isShadow: isShadow,
       editable: editorState.editable,
       alignment: alignment,
       onResize: (width) {
@@ -196,8 +235,8 @@ class ImageBlockComponentWidgetState extends State<ImageBlockComponentWidget>
                   node: node,
                   delegate: this,
                   listenable: editorState.selectionNotifier,
-                  cursorColor: editorState.editorStyle.cursorColor,
-                  selectionColor: editorState.editorStyle.selectionColor,
+                  cursorColor: Colors.transparent,
+                  selectionColor: Colors.transparent,
                   child: child!,
                 ),
                 if (value) widget.menuBuilder!(widget.node, this),

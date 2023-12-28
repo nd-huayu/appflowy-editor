@@ -1,13 +1,16 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:appflowy_editor/src/editor/custom/scroll/no_bar_scroll_behavior.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/scroll/auto_scroller.dart';
 import 'package:flutter/material.dart';
 
 class AutoScrollableWidget extends StatefulWidget {
+  final bool scrollbarVisible; // fyl 是否显示进度条
   const AutoScrollableWidget({
     super.key,
     this.shrinkWrap = false,
     required this.scrollController,
     required this.builder,
+    this.scrollbarVisible = true,
   });
 
   final bool shrinkWrap;
@@ -37,8 +40,24 @@ class _AutoScrollableWidgetState extends State<AutoScrollableWidget> {
     if (widget.shrinkWrap) {
       return widget.builder(context, _autoScroller);
     } else {
-      return Builder(
-        builder: builder,
+      return LayoutBuilder(
+        builder: (context, viewportConstraints) => ScrollConfiguration(
+          behavior: widget.scrollbarVisible // fyl 是否显示进度条
+              ? ScrollConfiguration.of(context)
+              : const NoBarScrollBehavior(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.only(right: 1),
+            controller: widget.scrollController,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minHeight: viewportConstraints.maxHeight,
+              ),
+              child: Builder(
+                builder: builder,
+              ),
+            ),
+          ),
+        ),
       );
     }
   }

@@ -70,11 +70,16 @@ extension SelectionTransform on EditorState {
           ? nodes.first.children.first
           : nodes.first;
       if (node.delta != null) {
-        transaction.deleteText(
-          node,
-          selection.startIndex,
-          selection.length,
-        );
+        if(node.type == ImageBlockKeys.type || node.isMediaType()){
+          transaction.deleteNode(node);
+        }
+        else{
+          transaction.deleteText(
+            node,
+            selection.startIndex,
+            selection.length,
+          );
+        }
       } else if (node.parent?.type != TableCellBlockKeys.type) {
         transaction.deleteNode(node);
       }
@@ -89,84 +94,63 @@ extension SelectionTransform on EditorState {
         final node = nodes[i];
 
         // The first node is at the beginning of the selection.
-        // All other nodes can be deleted.
-        if (i != 0) {
-          // Never delete a table cell node child
-          if (node.parent?.type == TableCellBlockKeys.type) {
-            if (!nodes.any((n) => n.id == node.parent?.parent?.id)) {
+        if (i == 0) {
+          if (selection.start.offset == 0) {
+            transaction.deleteNode(node);
+          } else {
+            // If the last node is also a text node, then we can merge the text
+            // between the two nodes.
+            if (nodes.last.delta != null) {
+              transaction.mergeText(
+                node,
+                nodes.last,
+                leftOffset: selection.startIndex,
+                rightOffset: selection.endIndex,
+              );
+
+              // combine the children of the last node into the first node.
+              final last = nodes.last;
+
+              if (last.children.isNotEmpty) {
+                if (indentableBlockTypes.contains(node.type)) {
+                  transaction.insertNodes(
+                    node.path + [0],
+                    last.children,
+                    deepCopy: true,
+                  );
+                } else {
+                  transaction.insertNodes(
+                    node.path.next,
+                    last.children,
+                    deepCopy: true,
+                  );
+                }
+              }
+            }
+
+            // Otherwise, we can just delete the selected text.
+            else {
               transaction.deleteText(
                 node,
-                0,
-                selection.end.offset,
+                selection.startIndex,
+                selection.length,
               );
             }
           }
-          // If first node was inside table cell then it wasn't mergable to last
-          // node, So we should not delete the last node. Just delete part of
-          // the text inside selection
-          else if (node.id == nodes.last.id &&
-              nodes.first.parent?.type == TableCellBlockKeys.type) {
-            transaction.deleteText(
-              node,
-              0,
-              selection.end.offset,
-            );
-          } else if (node.type != TableCellBlockKeys.type) {
-            transaction.deleteNode(node);
-          }
-          continue;
+        } else if (i < nodes.length - 1) {
+          transaction.deleteNode(node);
         }
 
-        // If the last node is also a text node and not a node inside table cell,
-        // and also the current node isn't inside table cell, then we can merge
-        // the text between the two nodes.
-        if (nodes.last.delta != null &&
-            ![node.parent?.type, nodes.last.parent?.type]
-                .contains(TableCellBlockKeys.type)) {
-          transaction.mergeText(
-            node,
-            nodes.last,
-            leftOffset: selection.startIndex,
-            rightOffset: selection.endIndex,
-          );
-
-          // combine the children of the last node into the first node.
-          final last = nodes.last;
-
-          if (last.children.isNotEmpty) {
-            if (indentableBlockTypes.contains(node.type)) {
-              transaction.insertNodes(
-                node.path + [0],
-                last.children,
-                deepCopy: true,
-              );
-            } else {
-              transaction.insertNodes(
-                node.path.next,
-                last.children,
-                deepCopy: true,
-              );
-            }
-          }
-        }
-
-        // Otherwise, we can just delete the selected text.
+        // All other nodes can be deleted.
         else {
-          // If the last or first node is inside table we will only delete
-          // selection part of first node.
-          if (nodes.last.parent?.type == TableCellBlockKeys.type ||
-              node.parent?.type == TableCellBlockKeys.type) {
-            transaction.deleteText(
-              node,
-              selection.startIndex,
-              node.delta!.length - selection.startIndex,
-            );
-          } else {
+          if (selection.start.offset == 0) {
             transaction.deleteText(
               node,
               selection.startIndex,
               selection.length,
             );
+          } else {
+            transaction.deleteNode(node);
           }
         }
       }

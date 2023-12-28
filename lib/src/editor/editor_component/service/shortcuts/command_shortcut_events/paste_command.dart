@@ -1,5 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/shortcuts/command_shortcut_events/copy_paste_extension.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 final List<CommandShortcutEvent> pasteCommands = [
@@ -57,6 +58,11 @@ CommandShortcutEventHandler _pasteCommandHandler = (editorState) {
     final data = await AppFlowyClipboard.getData();
     final text = data.text;
     final html = data.html;
+
+    if (kDebugMode) {
+      // print('paste ${html}');
+    }
+
     if (html != null && html.isNotEmpty) {
       await editorState.deleteSelectionIfNeeded();
       // if the html is pasted successfully, then return
@@ -83,10 +89,14 @@ extension on EditorState {
   Future<bool> pasteHtml(String html) async {
     final nodes = htmlToDocument(html).root.children.toList();
     // remove the front and back empty line
-    while (nodes.isNotEmpty && nodes.first.delta?.isEmpty == true) {
+    while (nodes.isNotEmpty &&
+        !nodes.first.isMediaType() &&
+        nodes.first.delta?.isEmpty == true) {
       nodes.removeAt(0);
     }
-    while (nodes.isNotEmpty && nodes.last.delta?.isEmpty == true) {
+    while (nodes.isNotEmpty &&
+        !nodes.last.isMediaType() &&
+        nodes.last.delta?.isEmpty == true) {
       nodes.removeLast();
     }
     if (nodes.isEmpty) {

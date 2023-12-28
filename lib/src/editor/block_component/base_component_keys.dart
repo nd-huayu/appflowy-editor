@@ -23,8 +23,25 @@ const blockComponentTextDirectionAuto = 'auto';
 const blockComponentTextDirectionLTR = 'ltr';
 const blockComponentTextDirectionRTL = 'rtl';
 
+/// 文本对齐
+const blockComponentTextAlign = 'align';
+const blockComponentTextAlignLeft = 'left';
+const blockComponentTextAlignCenter = 'center';
+const blockComponentTextAlignRight = 'right';
+const blockComponentTextAlignJustify = 'justify';
+
+/// 文本行高
+const blockComponentTextHeight = 'line_height';
+
 /// text align
 ///
 /// its value must be one of the following:
 ///  - left, right, center.
 const blockComponentAlign = 'align';
+
+/// 文本段前段后
+const blockPreParagraph = 'pre_paragraph';
+const blockAfterParagraph = 'after_paragraph';
+
+/// 缩进
+const blockIndent = 'indent';

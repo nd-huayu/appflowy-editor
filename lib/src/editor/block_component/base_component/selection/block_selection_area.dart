@@ -135,6 +135,7 @@ class _BlockSelectionAreaState extends State<BlockSelectionArea> {
           return SelectionAreaPaint(
             rects: prevSelectionRects!,
             selectionColor: widget.selectionColor,
+            node: widget.node,
           );
         }
       }),

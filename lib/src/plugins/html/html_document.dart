@@ -6,7 +6,9 @@ import 'package:appflowy_editor/src/core/document/document.dart';
 import 'package:appflowy_editor/src/plugins/html/html_document_decoder.dart';
 import 'package:appflowy_editor/src/plugins/html/html_document_encoder.dart';
 
+import 'encoder/parser/audio_node_parser.dart';
 import 'encoder/parser/html_parser.dart';
+import 'encoder/parser/video_node_parser.dart';
 
 /// Converts a html to [Document].
 Document htmlToDocument(String html) {
@@ -28,6 +30,8 @@ String documentToHTML(
       const HTMLQuoteNodeParser(),
       const HTMLHeadingNodeParser(),
       const HTMLImageNodeParser(),
+      const HTMLAudioNodeParser(),
+      const HTMLVideoNodeParser(),
     ],
   ).encode(document);
 }

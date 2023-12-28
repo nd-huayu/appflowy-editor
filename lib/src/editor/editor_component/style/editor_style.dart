@@ -15,7 +15,11 @@ class EditorStyle {
     required this.textStyleConfiguration,
     required this.textSpanDecorator,
     this.defaultTextDirection,
+    this.customData,
   });
+
+  /// fyl:自定义的数据，如“分页线”相关数据
+  final CustomStyleData? customData;
 
   /// The padding of the editor.
   final EdgeInsets padding;
@@ -45,11 +49,13 @@ class EditorStyle {
 
   const EditorStyle.desktop({
     EdgeInsets? padding,
+    Color? backgroundColor,
     Color? cursorColor,
     Color? selectionColor,
     TextStyleConfiguration? textStyleConfiguration,
     TextSpanDecoratorForAttribute? textSpanDecorator,
     this.defaultTextDirection,
+    CustomStyleData? customDataParam,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 100),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         selectionColor =
@@ -59,15 +65,18 @@ class EditorStyle {
               text: TextStyle(fontSize: 16, color: Colors.black),
             ),
         textSpanDecorator =
-            textSpanDecorator ?? defaultTextSpanDecoratorForAttribute;
+            textSpanDecorator ?? defaultTextSpanDecoratorForAttribute,
+        customData = customDataParam;
 
   const EditorStyle.mobile({
     EdgeInsets? padding,
+    Color? backgroundColor,
     Color? cursorColor,
     Color? selectionColor,
     TextStyleConfiguration? textStyleConfiguration,
     TextSpanDecoratorForAttribute? textSpanDecorator,
     this.defaultTextDirection,
+    CustomStyleData? customDataParam,
   })  : padding = padding ?? const EdgeInsets.symmetric(horizontal: 20),
         cursorColor = cursorColor ?? const Color(0xFF00BCF0),
         selectionColor =
@@ -77,15 +86,18 @@ class EditorStyle {
               text: TextStyle(fontSize: 16, color: Colors.black),
             ),
         textSpanDecorator =
-            textSpanDecorator ?? mobileTextSpanDecoratorForAttribute;
+            textSpanDecorator ?? mobileTextSpanDecoratorForAttribute,
+        customData = customDataParam;
 
   EditorStyle copyWith({
     EdgeInsets? padding,
+    Color? backgroundColor,
     Color? cursorColor,
     Color? selectionColor,
     TextStyleConfiguration? textStyleConfiguration,
     TextSpanDecoratorForAttribute? textSpanDecorator,
     String? defaultTextDirection,
+    CustomStyleData? customData,
   }) {
     return EditorStyle(
       padding: padding ?? this.padding,
@@ -95,6 +107,7 @@ class EditorStyle {
           textStyleConfiguration ?? this.textStyleConfiguration,
       textSpanDecorator: textSpanDecorator ?? this.textSpanDecorator,
       defaultTextDirection: defaultTextDirection,
+      customData: customData ?? this.customData,
     );
   }
 }

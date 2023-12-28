@@ -33,8 +33,11 @@ class HTMLBulletedListNodeParser extends HTMLNodeParser {
       ),
     );
 
-    final element =
-        wrapChildrenNodesWithTagName(HTMLTags.list, childNodes: domNodes);
+    final element = wrapChildrenNodesWithTagName(
+      HTMLTags.list,
+      childNodes: domNodes,
+      attributes: node.attributes,
+    );
     return [
       dom.Element.tag(HTMLTags.unorderedList)..append(element),
     ];

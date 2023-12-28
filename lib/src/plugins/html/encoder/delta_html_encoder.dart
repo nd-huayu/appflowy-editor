@@ -27,6 +27,10 @@ class DeltaHTMLEncoder extends Converter<Delta, List<dom.Node>> {
 
     // if there is only one attribute, we can use the tag directly
     if (attributes.length == 1) {
+      final value = attributes.values.first;
+      if (value is bool && !value) {
+        return dom.Text(text);
+      }
       return convertSingleAttributeTextInsertToDomNode(text, attributes);
     }
 
@@ -63,6 +67,9 @@ class DeltaHTMLEncoder extends Converter<Delta, List<dom.Node>> {
     };
 
     final tag = keyToTag[attributes.keys.first];
+    if (tag == null) {
+      return convertMultipleAttributeTextInsertToDomNode(text, attributes);
+    }
     return dom.Element.tag(tag)..append(domText);
   }
 
@@ -150,6 +157,24 @@ class DeltaHTMLEncoder extends Converter<Delta, List<dom.Node>> {
     final color = attributes.color;
     if (color != null) {
       cssMap['color'] = color.toRgbaString();
+    }
+
+    final fontSize = attributes.fontSize;
+    if (fontSize != null) {
+      cssMap['font-size'] = fontSize.toString();
+    }
+
+    final fontFamily = attributes.fontFamily;
+    if (fontFamily != null) {
+      cssMap['font-family'] = fontFamily;
+    }
+
+    final superScript = attributes.superScript;
+    final subScript = attributes.subScript;
+    if (superScript) {
+      cssMap['super-script'] = 'superScript';
+    } else if (subScript) {
+      cssMap['super-script'] = 'subScript';
     }
 
     return cssMap.entries.map((e) => '${e.key}: ${e.value}').join('; ');

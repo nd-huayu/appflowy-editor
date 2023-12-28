@@ -3,6 +3,8 @@ import 'dart:math';
 import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 
+import '../../../../core/document/node.dart';
+
 class AnimatedSelectionAreaPaint extends StatefulWidget {
   const AnimatedSelectionAreaPaint({
     super.key,
@@ -86,15 +88,19 @@ class SelectionAreaPaint extends StatelessWidget {
     super.key,
     required this.rects,
     required this.selectionColor,
+    required this.node,
   });
 
   final List<Rect> rects;
   final Color selectionColor;
+  // the node of the block
+  final Node node;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       painter: SelectionAreaPainter(
+        node,
         rects: rects,
         selectionColor: selectionColor,
       ),
@@ -103,13 +109,16 @@ class SelectionAreaPaint extends StatelessWidget {
 }
 
 class SelectionAreaPainter extends CustomPainter {
-  SelectionAreaPainter({
+  SelectionAreaPainter(
+    this.node, {
     required this.rects,
     required this.selectionColor,
   });
 
   final List<Rect> rects;
   final Color selectionColor;
+  // the node of the block
+  final Node node;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -120,7 +129,11 @@ class SelectionAreaPainter extends CustomPainter {
     for (var rect in rects) {
       // if rect.width is 0, we draw a small rect to indicate the selection area
       if (rect.width <= 0) {
-        rect = Rect.fromLTWH(rect.left, rect.top, 8.0, rect.height);
+        double showWidth = 0.0;
+        if (node.delta == null || node.delta!.isEmpty) {
+          showWidth = 8.0;
+        }
+        rect = Rect.fromLTWH(rect.left, rect.top, showWidth, rect.height);
       }
       canvas.drawRect(
         rect,

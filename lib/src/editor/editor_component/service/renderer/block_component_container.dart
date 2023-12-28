@@ -13,9 +13,11 @@ class BlockComponentContainer extends StatefulWidget {
     required this.configuration,
     required this.node,
     required this.builder,
+    required this.editorState,
   });
 
   final Node node;
+  final EditorState editorState;
   final BlockComponentConfiguration configuration;
 
   final WidgetBuilder builder;
@@ -26,6 +28,13 @@ class BlockComponentContainer extends StatefulWidget {
 }
 
 class BlockComponentContainerState extends State<BlockComponentContainer> {
+  bool get _showLockBorder {
+    if (widget.node.type == 'page') {
+      return false;
+    }
+    return widget.node.isLocked();
+  }
+
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider<Node>.value(
@@ -33,9 +42,22 @@ class BlockComponentContainerState extends State<BlockComponentContainer> {
       child: Consumer<Node>(
         builder: (_, __, ___) {
           Log.editor.debug('node is rebuilding...: type: ${widget.node.type} ');
+          widget.editorState.wordChange = true;
+          Widget child = widget.builder(context);
+          if (_showLockBorder) {
+            child = Container(
+              foregroundDecoration: BoxDecoration(
+                border: Border.all(
+                  color: Colors.red.withAlpha(100),
+                  width: 1,
+                ),
+              ),
+              child: child,
+            );
+          }
           return CompositedTransformTarget(
             link: widget.node.layerLink,
-            child: widget.builder(context),
+            child: child,
           );
         },
       ),

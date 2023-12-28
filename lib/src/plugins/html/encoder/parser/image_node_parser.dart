@@ -40,6 +40,16 @@ class HTMLImageNodeParser extends HTMLNodeParser {
       anchor.attributes['align'] = align;
     }
 
+    final degree = node.attributes[ImageBlockKeys.degree];
+    if (degree != null) {
+      anchor.attributes[ImageBlockKeys.degree] = degree;
+    }
+
+    final isShadow = node.attributes[ImageBlockKeys.isShadow];
+    if (isShadow != null) {
+      anchor.attributes[ImageBlockKeys.isShadow] = isShadow;
+    }
+
     return [
       anchor,
       ...processChildrenNodes(

@@ -126,6 +126,8 @@ class UndoManager {
       options: const ApplyOptions(
         recordUndo: false,
         recordRedo: true,
+        fromUndoOpt: true,
+        fromRedoOpt: false,
       ),
     );
   }
@@ -146,6 +148,8 @@ class UndoManager {
       options: const ApplyOptions(
         recordUndo: true,
         recordRedo: false,
+        fromUndoOpt: false,
+        fromRedoOpt: true,
       ),
     );
   }

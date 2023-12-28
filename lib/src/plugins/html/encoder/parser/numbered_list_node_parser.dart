@@ -30,8 +30,11 @@ class HTMLNumberedListNodeParser extends HTMLNodeParser {
       processChildrenNodes(node.children, encodeParsers: encodeParsers),
     );
 
-    final element =
-        wrapChildrenNodesWithTagName(HTMLTags.list, childNodes: domNodes);
+    final element = wrapChildrenNodesWithTagName(
+      HTMLTags.list,
+      childNodes: domNodes,
+      attributes: node.attributes,
+    );
     return [
       dom.Element.tag(HTMLTags.orderedList)..append(element),
     ];

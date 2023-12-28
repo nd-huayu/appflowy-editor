@@ -50,6 +50,7 @@ class PageBlockComponent extends BlockComponentStatelessWidget {
     final editorState = context.read<EditorState>();
     final scrollController = context.read<EditorScrollController>();
     final items = node.children;
+    editorState.headingChange = true;
 
     if (scrollController.shrinkWrap) {
       return Builder(
@@ -61,7 +62,8 @@ class PageBlockComponent extends BlockComponentStatelessWidget {
               ...items
                   .map(
                     (e) => Padding(
-                      padding: editorState.editorStyle.padding,
+                      // padding: editorState.editorStyle.padding,
+                      padding: e.getNodeEdgeInsets(),
                       child: editorState.renderer.build(context, e),
                     ),
                   )

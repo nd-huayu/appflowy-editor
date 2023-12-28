@@ -2,6 +2,8 @@ import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/block_component/base_component/block_icon_builder.dart';
 import 'package:flutter/material.dart';
 
+import '../base_component/text_align_mixin.dart';
+
 class TodoListBlockKeys {
   const TodoListBlockKeys._();
 
@@ -102,7 +104,7 @@ class _TodoListBlockComponentWidgetState
         BlockComponentBackgroundColorMixin,
         NestedBlockComponentStatefulWidgetMixin,
         BlockComponentTextDirectionMixin,
-        BlockComponentAlignMixin {
+        BlockComponentTextAlignMixin {
   @override
   final forwardKey = GlobalKey(debugLabel: 'flowy_rich_text');
 
@@ -130,14 +132,14 @@ class _TodoListBlockComponentWidgetState
     final textDirection = calculateTextDirection(
       layoutDirection: Directionality.maybeOf(context),
     );
+    final textAlign = calculateTextAlign();
 
     Widget child = Container(
       color: withBackgroundColor ? backgroundColor : null,
       width: double.infinity,
-      alignment: alignment,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: calculateRowMainAxisAlignment(textAlign),
         mainAxisSize: MainAxisSize.min,
         textDirection: textDirection,
         children: [
@@ -153,7 +155,6 @@ class _TodoListBlockComponentWidgetState
               delegate: this,
               node: widget.node,
               editorState: editorState,
-              textAlign: alignment?.toTextAlign,
               placeholderText: placeholderText,
               textDirection: textDirection,
               textSpanDecorator: (textSpan) =>
@@ -165,6 +166,7 @@ class _TodoListBlockComponentWidgetState
                   textSpan.updateTextStyle(
                 placeholderTextStyle,
               ),
+              textAlign: textAlign,
               cursorColor: editorState.editorStyle.cursorColor,
               selectionColor: editorState.editorStyle.selectionColor,
             ),

@@ -3,6 +3,8 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../base_component/text_align_mixin.dart';
+
 class HeadingBlockKeys {
   const HeadingBlockKeys._();
 
@@ -96,7 +98,7 @@ class _HeadingBlockComponentWidgetState
         BlockComponentConfigurable,
         BlockComponentBackgroundColorMixin,
         BlockComponentTextDirectionMixin,
-        BlockComponentAlignMixin {
+        BlockComponentTextAlignMixin {
   @override
   final forwardKey = GlobalKey(debugLabel: 'flowy_rich_text');
 
@@ -124,17 +126,16 @@ class _HeadingBlockComponentWidgetState
     final textDirection = calculateTextDirection(
       layoutDirection: Directionality.maybeOf(context),
     );
+    final textAlign = calculateTextAlign();
 
     Widget child = Container(
       color: backgroundColor,
       width: double.infinity,
-      alignment: alignment,
       // Related issue: https://github.com/AppFlowy-IO/AppFlowy/issues/3175
       // make the width of the rich text as small as possible to avoid
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.start,
+        mainAxisAlignment: calculateRowMainAxisAlignment(textAlign),
         textDirection: textDirection,
         children: [
           Flexible(
@@ -143,25 +144,23 @@ class _HeadingBlockComponentWidgetState
               delegate: this,
               node: widget.node,
               editorState: editorState,
-              textAlign: alignment?.toTextAlign,
-              textSpanDecorator: (textSpan) {
-                var result = textSpan.updateTextStyle(textStyle);
-                result = result.updateTextStyle(
-                  widget.textStyleBuilder?.call(level) ??
-                      defaultTextStyle(level),
-                );
-                return result;
-              },
+              // 属性写到对应文本中了，这里要屏蔽
+              // textSpanDecorator: (textSpan) =>
+              //     textSpan.updateTextStyle(textStyle).updateTextStyle(
+              //           widget.textStyleBuilder?.call(level) ??
+              //               defaultTextStyle(level),
+              //         ),
               placeholderText: placeholderText,
-              placeholderTextSpanDecorator: (textSpan) => textSpan
-                  .updateTextStyle(
-                    placeholderTextStyle,
-                  )
-                  .updateTextStyle(
-                    widget.textStyleBuilder?.call(level) ??
-                        defaultTextStyle(level),
-                  ),
+              // placeholderTextSpanDecorator: (textSpan) => textSpan
+              //     .updateTextStyle(
+              //       placeholderTextStyle,
+              //     )
+              //     .updateTextStyle(
+              //       widget.textStyleBuilder?.call(level) ??
+              //           defaultTextStyle(level),
+              //     ),
               textDirection: textDirection,
+              textAlign: textAlign,
               cursorColor: editorState.editorStyle.cursorColor,
               selectionColor: editorState.editorStyle.selectionColor,
             ),
@@ -199,8 +198,8 @@ class _HeadingBlockComponentWidgetState
   }
 
   TextStyle? defaultTextStyle(int level) {
-    final fontSizes = [32.0, 28.0, 24.0, 18.0, 18.0, 18.0];
-    final fontSize = fontSizes.elementAtOrNull(level) ?? 18.0;
+    final fontSizes = [24.0, 18.0, 15.0, 12.0, 18.0, 18.0];
+    final fontSize = fontSizes.elementAtOrNull(level - 1) ?? 18.0;
     return TextStyle(
       fontSize: fontSize,
       fontWeight: FontWeight.bold,

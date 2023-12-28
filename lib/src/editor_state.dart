@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/editor/editor_component/service/scroll/auto_scroller.dart';
 import 'package:appflowy_editor/src/history/undo_manager.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:tuple/tuple.dart';
+
+import 'history/universal_undo_manager_2.dart';
 
 class ApplyOptions {
   /// This flag indicates that
@@ -12,9 +16,13 @@ class ApplyOptions {
   /// the undo stack
   final bool recordUndo;
   final bool recordRedo;
+  final bool fromUndoOpt;
+  final bool fromRedoOpt;
   const ApplyOptions({
     this.recordUndo = true,
     this.recordRedo = false,
+    this.fromUndoOpt = false,
+    this.fromRedoOpt = false,
   });
 }
 
@@ -40,6 +48,24 @@ enum TransactionTime {
   before,
   after,
 }
+
+/// 是否屏蔽部分功能
+const bool isCoverAll = false;
+
+typedef DirectoryClickCallback = void Function(Node node);
+
+/// 点击抬起时回调
+typedef TapUpCallback = void Function(TapUpDetails tapUpDetails);
+
+/// 选区结束时回调
+typedef PanEndCallback = void Function(DragEndDetails dragEndDetails);
+
+/// 字体加载回调
+typedef SupportDisplayFamily = List<String> Function(
+  String? curFamily,
+  String content,
+  Node node,
+);
 
 /// The state of the editor.
 ///
@@ -84,6 +110,9 @@ class EditorState {
 
   // the minimum duration for saving the history item.
   final Duration minHistoryItemDuration;
+  // 获取协同控制接口
+  IDocCooperativeApi? get cooperativeApi =>
+      document.root.root?.firstChild as IDocCooperativeApi;
 
   /// Whether the editor is editable.
   bool editable = true;
@@ -91,16 +120,30 @@ class EditorState {
   /// The style of the editor.
   late EditorStyle editorStyle;
 
+  double curCanvasScale = 1.0;
+
   /// The selection notifier of the editor.
-  final PropertyValueNotifier<Selection?> selectionNotifier =
+  PropertyValueNotifier<Selection?> selectionNotifier =
       PropertyValueNotifier<Selection?>(null);
 
   /// The selection of the editor.
   Selection? get selection => selectionNotifier.value;
 
+  /// fyl：上一次的选中区域，用来修复文本内容好几页时，全选-更改字号会触发内容滚动问题
+  Selection? preSelection;
+
   /// Sets the selection of the editor.
   set selection(Selection? value) {
+    preSelection = selectionNotifier.value;
     selectionNotifier.value = value;
+  }
+
+  /// 标题变化通知器
+  final PropertyValueNotifier<bool> headingNotifier =
+      PropertyValueNotifier<bool>(false);
+
+  set headingChange(bool isChange) {
+    headingNotifier.value = isChange;
   }
 
   SelectionType? selectionType;
@@ -145,7 +188,7 @@ class EditorState {
     sync: true,
   );
 
-  final UndoManager undoManager = UndoManager();
+  final UniversalUndoManager2 undoManager = UniversalUndoManager2(1000);
 
   Transaction get transaction {
     final transaction = Transaction(document: document);
@@ -187,7 +230,6 @@ class EditorState {
     }
 
     // broadcast to other users here
-    selectionExtraInfo = extraInfo;
     _selectionUpdateReason = reason;
     this.selection = selection;
 
@@ -273,8 +315,36 @@ class EditorState {
 
     // TODO: execute this line after the UI has been updated.
     completer.complete();
+    _checkTransactionHeading(transaction);
+    wordChange = true;
 
     return completer.future;
+  }
+
+  /// check current transcation heading
+  void _checkTransactionHeading(Transaction transaction) {
+    // 如果是标题增加或者移除，要通知外层
+    for (var element in transaction.operations) {
+      if (element is InsertOperation || element is DeleteOperation) {
+        Iterable<Node> nodes;
+        if (element is InsertOperation) {
+          nodes = element.nodes;
+        } else {
+          nodes = (element as DeleteOperation).nodes;
+        }
+        bool isFind = false;
+        for (final node in nodes) {
+          if (node.type == HeadingBlockKeys.type) {
+            headingChange = true;
+            isFind = true;
+            break;
+          }
+        }
+        if (isFind) {
+          break;
+        }
+      }
+    }
   }
 
   /// Force rebuild the editor.
@@ -392,8 +462,12 @@ class EditorState {
   }
 
   /// The current selection areas's rect in editor.
-  List<Rect> selectionRects() {
-    final selection = this.selection;
+  List<Rect> selectionRects({Selection? targetSelection}) {
+    Selection? selection = this.selection;
+
+    if (targetSelection != null) {
+      selection = targetSelection;
+    }
     if (selection == null) {
       return [];
     }
@@ -464,14 +538,22 @@ class EditorState {
 
   void _recordRedoOrUndo(ApplyOptions options, Transaction transaction) {
     if (options.recordUndo) {
-      final undoItem = undoManager.getUndoHistoryItem();
+      final undoItem = undoManager.getUndoHistoryItem(options.fromRedoOpt);
       undoItem.addAll(transaction.operations);
       if (undoItem.beforeSelection == null &&
           transaction.beforeSelection != null) {
         undoItem.beforeSelection = transaction.beforeSelection;
       }
       undoItem.afterSelection = transaction.afterSelection;
-      _debouncedSealHistoryItem();
+      if (options.fromUndoOpt) {
+        if (undoManager.undoStack.isNonEmpty) {
+          Log.editor.debug('Seal history item');
+          final last = undoManager.undoStack.last;
+          last.seal();
+        }
+      } else {
+        _debouncedSealHistoryItem();
+      }
     } else if (options.recordRedo) {
       final redoItem = HistoryItem();
       redoItem.addAll(transaction.operations);
@@ -508,5 +590,76 @@ class EditorState {
     } else if (op is UpdateTextOperation) {
       document.updateText(op.path, op.delta);
     }
+  }
+
+  /// 获取标题Nodes
+  List<Node> getAllHeadingNodes() {
+    List<Node> headingNodes = [];
+    for (var element in document.root.children) {
+      if (element.type == HeadingBlockKeys.type) {
+        headingNodes.add(element);
+      }
+    }
+    return headingNodes;
+  }
+
+  /// 目录点击回调
+  DirectoryClickCallback? onDirectoryClick;
+
+  /// 获取当前node字体最大和最小值
+  Tuple2<double, double> getCurNodeMaxFontSize(Node node) {
+    double maxFontSize = 16;
+    double minFontSize = 16;
+
+    final textInserts = node.delta!.whereType<TextInsert>();
+    int firstIndex = 0;
+    for (final textInsert in textInserts) {
+      final attributes = textInsert.attributes;
+      if (firstIndex == 0) {
+        if (attributes != null) {
+          if (attributes.fontSize != null) {
+            maxFontSize = attributes.fontSize!;
+            minFontSize = attributes.fontSize!;
+          }
+        }
+      } else {
+        if (attributes != null) {
+          if (attributes.fontSize != null) {
+            maxFontSize = max(maxFontSize, attributes.fontSize!);
+            minFontSize = min(minFontSize, attributes.fontSize!);
+          }
+        }
+      }
+      firstIndex++;
+    }
+    return Tuple2(minFontSize, maxFontSize);
+  }
+
+  /// 单击抬起回调
+  TapUpCallback? onTapUpCallback;
+
+  /// 选区结束回调
+  PanEndCallback? onPanEndCallback;
+
+  /// 是否支持当前字体
+  SupportDisplayFamily? onSupportDisplayFamily;
+
+  /// 字数变化通知器
+  final PropertyValueNotifier<bool> wordNotifier =
+      PropertyValueNotifier<bool>(false);
+
+  set wordChange(bool isChange) {
+    wordNotifier.value = isChange;
+  }
+
+  /// 文档字数
+  int getDocumentWordLength() {
+    int totalLength = 0;
+    for (var node in document.root.children) {
+      if (node.delta != null) {
+        totalLength += node.delta!.toPlainText().replaceAll('\t', '').replaceAll(' ', '').length;
+      }
+    }
+    return totalLength;
   }
 }

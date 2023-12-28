@@ -2,27 +2,35 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:string_validator/string_validator.dart';
 
 import 'base64_image.dart';
 
 class ResizableImage extends StatefulWidget {
-  const ResizableImage({
-    super.key,
-    required this.alignment,
-    required this.editable,
-    required this.onResize,
-    required this.width,
-    required this.src,
-    this.height,
-  });
+  const ResizableImage(
+      {super.key,
+      required this.alignment,
+      required this.editable,
+      required this.onResize,
+      required this.width,
+      required this.src,
+      required this.listenable,
+      required this.nodeBoardColor,
+      this.height,
+      this.degree,
+      this.isShadow = false});
 
   final String src;
   final double width;
   final double? height;
+  final double? degree;
   final Alignment alignment;
   final bool editable;
+  final bool isShadow;
+  final ValueListenable<bool> listenable;
+  final Color nodeBoardColor;
 
   final void Function(double width) onResize;
 
@@ -85,6 +93,8 @@ class _ResizableImageState extends State<ResizableImage> {
         widget.src,
         width: widget.width,
         gaplessPlayback: true,
+        isAntiAlias: true,
+        fit: BoxFit.fitWidth,
         loadingBuilder: (context, child, loadingProgress) {
           if (loadingProgress == null ||
               loadingProgress.cumulativeBytesLoaded ==
@@ -103,7 +113,39 @@ class _ResizableImageState extends State<ResizableImage> {
     }
     return Stack(
       children: [
-        child,
+        Transform.rotate(
+          angle: widget.degree ?? 0,
+          child: widget.isShadow
+              ? DecoratedBox(
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.withOpacity(0.5), // 阴影颜色
+                        spreadRadius: 5, // 阴影扩散程度
+                        blurRadius: 7, // 阴影模糊程度
+                        offset: const Offset(0, 3), // 阴影的偏移量
+                      ),
+                    ],
+                  ),
+                  child: child)
+              : child,
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: widget.listenable,
+          builder: (context, value, c) {
+            return value
+                ? Positioned.fill(
+                    child: Container(
+                    decoration: BoxDecoration(
+                        border: Border.all(
+                      color: widget.nodeBoardColor,
+                      width: 2.0,
+                    )),
+                  ))
+                : const SizedBox.shrink();
+          },
+          child: child,
+        ),
         if (widget.editable) ...[
           _buildEdgeGesture(
             context,

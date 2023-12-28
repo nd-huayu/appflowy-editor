@@ -50,6 +50,7 @@ class BlockSelectionContainer extends StatelessWidget {
           ? AlignmentDirectional.topStart
           : AlignmentDirectional.topEnd,
       children: [
+        child,
         BlockSelectionArea(
           node: node,
           delegate: delegate,
@@ -59,7 +60,6 @@ class BlockSelectionContainer extends StatelessWidget {
           blockColor: blockColor,
           supportTypes: supportTypes,
         ),
-        child,
       ],
     );
   }

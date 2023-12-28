@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:appflowy_editor/src/extensions/insert_extension.dart';
 import 'package:file_picker/file_picker.dart' as fp;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -355,49 +356,5 @@ class _UploadImageMenuState extends State<UploadImageMenu> {
 
   bool _validateUrl(String url) {
     return url.isNotEmpty && isURL(url);
-  }
-}
-
-extension InsertImage on EditorState {
-  Future<void> insertImageNode(
-    String src,
-  ) async {
-    final selection = this.selection;
-    if (selection == null || !selection.isCollapsed) {
-      return;
-    }
-    final node = getNodeAtPath(selection.end.path);
-    if (node == null) {
-      return;
-    }
-    final transaction = this.transaction;
-    // if the current node is empty paragraph, replace it with image node
-    if (node.type == ParagraphBlockKeys.type &&
-        (node.delta?.isEmpty ?? false)) {
-      transaction
-        ..insertNode(
-          node.path,
-          imageNode(
-            url: src,
-          ),
-        )
-        ..deleteNode(node);
-    } else {
-      transaction.insertNode(
-        node.path.next,
-        imageNode(
-          url: src,
-        ),
-      );
-    }
-
-    transaction.afterSelection = Selection.collapsed(
-      Position(
-        path: node.path.next,
-        offset: 0,
-      ),
-    );
-
-    return apply(transaction);
   }
 }

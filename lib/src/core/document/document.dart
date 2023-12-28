@@ -1,5 +1,3 @@
-import 'dart:collection';
-
 import 'package:appflowy_editor/appflowy_editor.dart';
 
 /// [Document] represents an AppFlowy Editor document structure.
@@ -49,7 +47,7 @@ class Document {
   factory Document.empty() {
     final root = Node(
       type: 'document',
-      children: LinkedList<Node>()..add(TextNode.empty()),
+      children: List<Node>.empty(growable: true)..add(TextNode.empty()),
     );
     return Document(
       root: root,

@@ -45,8 +45,14 @@ class Transaction {
     Path path,
     Node node, {
     bool deepCopy = true,
+    bool transform = true,
   }) {
-    insertNodes(path, [node], deepCopy: deepCopy);
+    insertNodes(
+      path,
+      [node],
+      deepCopy: deepCopy,
+      transform: transform,
+    );
   }
 
   /// Inserts a sequence of [Node]s at the given [Path].
@@ -54,6 +60,7 @@ class Transaction {
     Path path,
     Iterable<Node> nodes, {
     bool deepCopy = true,
+    bool transform = true,
   }) {
     if (nodes.isEmpty) {
       return;
@@ -67,20 +74,34 @@ class Transaction {
         path,
         nodes,
       ),
+      transform: transform,
     );
   }
 
   /// Updates the attributes of the [Node].
   ///
   /// The [attributes] will be merged into the existing attributes.
-  void updateNode(Node node, Attributes attributes) {
+  void updateNode(
+    Node node,
+    Attributes attributes, {
+    Path? path,
+    bool transform = true,
+  }) {
     final inverted = invertAttributes(node.attributes, attributes);
+    Path targetPath;
+    if (path != null) {
+      targetPath = path;
+    } else {
+      targetPath = node.path;
+    }
+
     add(
       UpdateOperation(
-        node.path,
+        targetPath,
         {...attributes},
         inverted,
       ),
+      transform: transform,
     );
   }
 
@@ -207,7 +228,19 @@ extension TextTransaction on Transaction {
       'The index($index) is out of range or negative.',
     );
 
-    final newAttributes = attributes ?? delta.sliceAttributes(index);
+    Attributes? newAttributes = attributes ?? delta.sliceAttributes(index);
+    if (node.toggleAttributes != null) {
+      if (node.toggleAttributes!.isNotEmpty) {
+        node.toggleAttributes!.remove("position");
+        Map<String, dynamic> deltaAttributes = Map.from(node.toggleAttributes!);
+        if (newAttributes == null) {
+          newAttributes = deltaAttributes;
+        } else {
+          newAttributes.addAll(deltaAttributes);
+        }
+        node.toggleAttributes!.clear();
+      }
+    }
 
     final insert = Delta()
       ..retain(index)
@@ -323,6 +356,46 @@ extension TextTransaction on Transaction {
     addDeltaToComposeMap(node, format);
   }
 
+  void customFormatText(
+    Node node,
+    int index,
+    int length,
+    Attributes attributes,
+    Path path, {
+    bool transform = true,
+  }) {
+    final delta = node.delta;
+    if (delta == null) {
+      return;
+    }
+    afterSelection = beforeSelection;
+    final format = Delta()
+      ..retain(index)
+      ..retain(length, attributes: attributes);
+
+    _composeMap.putIfAbsent(node, () => []).add(format);
+
+    for (final entry in _composeMap.entries) {
+      final node = entry.key;
+      if (node.delta == null) {
+        continue;
+      }
+      final deltaQueue = entry.value;
+      final composed =
+          deltaQueue.fold<Delta>(node.delta!, (p, e) => p.compose(e));
+      assert(composed.every((element) => element is TextInsert));
+      updateNode(
+        node,
+        {
+          'delta': composed.toJson(),
+        },
+        path: path,
+        transform: transform,
+      );
+    }
+    _composeMap.clear();
+  }
+
   /// replace the text at the given [index] with the [text].
   void replaceText(
     Node node,
@@ -336,14 +409,18 @@ extension TextTransaction on Transaction {
       return;
     }
     var newAttributes = attributes;
-    if (index != 0 && attributes == null) {
-      newAttributes = delta.slice(max(index - 1, 0), index).first.attributes;
-      if (newAttributes == null) {
+    if (index != 0) {
+      if (attributes == null) {
+        newAttributes = delta.slice(max(index - 1, 0), index).first.attributes;
+        // if (newAttributes == null) {
         final slicedDelta = delta.slice(index, index + length);
         if (slicedDelta.isNotEmpty) {
           newAttributes = slicedDelta.first.attributes;
         }
+        // }
       }
+    } else {
+      newAttributes = delta.first.attributes;
     }
 
     final replace = Delta()
@@ -571,5 +648,29 @@ extension TextTransaction on Transaction {
   void addDeltaToComposeMap(Node node, Delta delta) {
     markNeedsComposing = true;
     _composeMap.putIfAbsent(node, () => []).add(delta);
+  }
+}
+
+extension on Delta {
+  Attributes? sliceAttributes(int index) {
+    if (index <= 0) {
+      if (operations.isEmpty) {
+        return null;
+      }
+    }
+    int begin = index - 1;
+    int end = index;
+    if (index == 0) {
+      begin = 0;
+      end = 1;
+    }
+    final attributes = slice(begin, end).first.attributes;
+    if (attributes == null ||
+        !attributes.keys.every(
+          (element) => AppFlowyRichTextKeys.supportSliced.contains(element),
+        )) {
+      return null;
+    }
+    return attributes;
   }
 }

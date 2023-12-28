@@ -25,8 +25,39 @@ abstract class HTMLNodeParser {
   dom.Element wrapChildrenNodesWithTagName(
     String tagName, {
     required List<dom.Node> childNodes,
+    required Attributes attributes,
   }) {
     final p = dom.Element.tag(tagName);
+    Attributes targetAttributes = {};
+    // 对齐
+    if (attributes.containsKey(blockComponentTextAlign)) {
+      targetAttributes[blockComponentTextAlign] =
+          attributes[blockComponentTextAlign];
+    }
+
+    // 行高
+    if (attributes.containsKey(blockComponentTextHeight)) {
+      targetAttributes[blockComponentTextHeight] =
+          attributes[blockComponentTextHeight];
+    }
+
+    // 缩进
+    if (attributes.containsKey(blockIndent)) {
+      targetAttributes[blockIndent] = attributes[blockIndent];
+    }
+
+    // 段前
+    if (attributes.containsKey(blockPreParagraph)) {
+      targetAttributes[blockPreParagraph] = attributes[blockPreParagraph];
+    }
+
+    // 段后
+    if (attributes.containsKey(blockAfterParagraph)) {
+      targetAttributes[blockAfterParagraph] = attributes[blockAfterParagraph];
+    }
+    String blockCssStr =
+        targetAttributes.entries.map((e) => '${e.key}: ${e.value}').join('; ');
+    p.attributes['style'] = blockCssStr;
     for (final node in childNodes) {
       p.append(node);
     }

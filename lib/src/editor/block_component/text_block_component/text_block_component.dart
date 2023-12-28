@@ -1,10 +1,15 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
 
+import '../base_component/text_align_mixin.dart';
+
 class ParagraphBlockKeys {
   ParagraphBlockKeys._();
 
   static const String type = 'paragraph';
+
+  /// 参考heading方式，增加level类型，用于区分正文（舒适）、正文（小）、说明（小）类型，值可为空
+  static const String level = 'level';
 
   static const String delta = blockComponentDelta;
 
@@ -81,7 +86,7 @@ class _TextBlockComponentWidgetState extends State<TextBlockComponentWidget>
         BlockComponentBackgroundColorMixin,
         NestedBlockComponentStatefulWidgetMixin,
         BlockComponentTextDirectionMixin,
-        BlockComponentAlignMixin {
+        BlockComponentTextAlignMixin {
   @override
   final forwardKey = GlobalKey(debugLabel: 'flowy_rich_text');
 
@@ -131,13 +136,13 @@ class _TextBlockComponentWidgetState extends State<TextBlockComponentWidget>
     final textDirection = calculateTextDirection(
       layoutDirection: Directionality.maybeOf(context),
     );
+    final textAlign = calculateTextAlign();
 
     Widget child = Container(
       color: withBackgroundColor ? backgroundColor : null,
       width: double.infinity,
-      alignment: alignment,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: calculateColumnMainAxisAlignment(textAlign),
         mainAxisAlignment: MainAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         textDirection: textDirection,
@@ -147,13 +152,13 @@ class _TextBlockComponentWidgetState extends State<TextBlockComponentWidget>
             delegate: this,
             node: widget.node,
             editorState: editorState,
-            textAlign: alignment?.toTextAlign,
             placeholderText: _showPlaceholder ? placeholderText : ' ',
             textSpanDecorator: (textSpan) =>
                 textSpan.updateTextStyle(textStyle),
             placeholderTextSpanDecorator: (textSpan) =>
                 textSpan.updateTextStyle(placeholderTextStyle),
             textDirection: textDirection,
+            textAlign: textAlign,
             cursorColor: editorState.editorStyle.cursorColor,
             selectionColor: editorState.editorStyle.selectionColor,
           ),

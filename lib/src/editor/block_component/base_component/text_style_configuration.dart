@@ -1,5 +1,12 @@
 import 'package:flutter/material.dart';
 
+const String notoFontFamily = "Noto Sans SC";
+const String initialFontFamily = "Blackboard Common";
+const List<String> defaultFontFamilyFallback = [
+  notoFontFamily,
+  initialFontFamily,
+];
+
 /// only for the common config of text style
 class TextStyleConfiguration {
   const TextStyleConfiguration({
@@ -19,6 +26,11 @@ class TextStyleConfiguration {
     this.code = const TextStyle(
       color: Colors.red,
       backgroundColor: Color.fromARGB(98, 0, 195, 255),
+    ),
+    this.fontSize = const TextStyle(fontSize: 16.0),
+    this.fontFamily = const TextStyle(
+      fontFamily: notoFontFamily,
+      fontFamilyFallback: defaultFontFamilyFallback,
     ),
   });
 
@@ -43,6 +55,12 @@ class TextStyleConfiguration {
   /// code text style
   final TextStyle code;
 
+  /// fontSize text style
+  final TextStyle fontSize;
+
+  /// fontFamily text style
+  final TextStyle fontFamily;
+
   TextStyleConfiguration copyWith({
     TextStyle? text,
     TextStyle? bold,
@@ -51,6 +69,8 @@ class TextStyleConfiguration {
     TextStyle? strikethrough,
     TextStyle? href,
     TextStyle? code,
+    TextStyle? fontSize,
+    TextStyle? fontFamily,
   }) {
     return TextStyleConfiguration(
       text: text ?? this.text,
@@ -60,6 +80,8 @@ class TextStyleConfiguration {
       strikethrough: strikethrough ?? this.strikethrough,
       href: href ?? this.href,
       code: code ?? this.code,
+      fontSize: fontSize ?? this.fontSize,
+      fontFamily: fontFamily ?? this.fontFamily,
     );
   }
 }

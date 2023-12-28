@@ -1,4 +1,6 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:appflowy_editor/src/editor/custom/widget/page_line_widget.dart';
+import 'package:appflowy_editor/src/editor/toolbar/desktop/editing_user_widget.dart';
 import 'package:appflowy_editor/src/flutter/overlay.dart';
 import 'package:appflowy_editor/src/service/context_menu/built_in_context_menu_item.dart';
 import 'package:flutter/material.dart' hide Overlay, OverlayEntry;
@@ -220,14 +222,35 @@ class _AppFlowyEditorState extends State<AppFlowyEditor> {
   }
 
   Widget _buildServices(BuildContext context) {
-    Widget child = editorState.renderer.build(
-      context,
-      editorState.document.root,
-      header: widget.header,
-      footer: widget.footer,
+    Widget child = Container(
+      padding: widget.editorStyle.padding,
+      decoration: widget.editorStyle.customData?.decoration, //fyl: 背景色
+      constraints: BoxConstraints(
+        minHeight: widget.editorStyle.customData?.minHeight ?? 0, // fyl: 最小高度
+      ),
+      child: editorState.renderer.build(
+        context,
+        editorState.document.root,
+        // header: widget.header,
+        // footer: widget.footer,
+      ),
     );
 
-    if (widget.editable) {
+    if (widget.header != null || widget.footer != null) {
+      child = Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (widget.header != null) widget.header!,
+          child,
+          if (widget.footer != null) widget.footer!,
+        ],
+      );
+    }
+
+    /// fyl: 放映模式（editable == false）可选择,可复制,暂时屏蔽这个判断
+    // if (widget.editable)
+    {
       child = SelectionServiceWidget(
         key: editorState.service.selectionServiceKey,
         cursorColor: widget.editorStyle.cursorColor,
@@ -243,8 +266,30 @@ class _AppFlowyEditorState extends State<AppFlowyEditor> {
       );
     }
 
+    /// 分页线
+    if (widget.editorStyle.customData?.showPageLine ?? false) {
+      child = Stack(
+        children: [
+          child,
+          PageLineWidget(
+            editorState: editorState,
+            lineWidth: widget.editorStyle.customData!.editorSize.width,
+            gapHeight: widget.editorStyle.customData!.editorSize.height -
+                widget.editorStyle.customData!.editorPadding!.vertical,
+            paddingTop: widget.editorStyle.customData!.headerHeight +
+                widget.editorStyle.customData!.editorPadding!.top,
+            paddingBottom: widget.editorStyle.customData!.footerHeight +
+                widget.editorStyle.customData!.editorPadding!.bottom,
+          ),
+        ],
+      );
+    }
+
+    child = EditingUserWidget(editorState: editorState, child: child);
+
     return ScrollServiceWidget(
       key: editorState.service.scrollServiceKey,
+      scrollbarVisible: widget.editorStyle.customData?.scrollbarVisible ?? true,
       editorScrollController: editorScrollController,
       child: child,
     );
@@ -264,6 +309,7 @@ class _AppFlowyEditorState extends State<AppFlowyEditor> {
   }
 
   BlockComponentRendererService get _renderer => BlockComponentRenderer(
+        editorState,
         builders: {...widget.blockComponentBuilders},
       );
 }

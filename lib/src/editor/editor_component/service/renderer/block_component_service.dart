@@ -102,12 +102,14 @@ abstract class BlockComponentRendererService {
 }
 
 class BlockComponentRenderer extends BlockComponentRendererService {
-  BlockComponentRenderer({
+  BlockComponentRenderer(
+    this.editorState, {
     required Map<String, BlockComponentBuilder> builders,
   }) {
     registerAll(builders);
   }
 
+  final EditorState editorState;
   final Map<String, BlockComponentBuilder> _builders = {};
 
   @override
@@ -129,6 +131,7 @@ class BlockComponentRenderer extends BlockComponentRendererService {
       if (errorBuilder != null) {
         return BlockComponentContainer(
           node: node,
+          editorState: editorState,
           configuration: errorBuilder.configuration,
           builder: (_) => errorBuilder.build(blockComponentContext),
         );
@@ -139,6 +142,7 @@ class BlockComponentRenderer extends BlockComponentRendererService {
 
     return BlockComponentContainer(
       node: node,
+      editorState: editorState,
       configuration: builder.configuration,
       builder: (_) => builder.build(blockComponentContext),
     );

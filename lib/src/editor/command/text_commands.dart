@@ -1,4 +1,5 @@
 import 'package:appflowy_editor/appflowy_editor.dart';
+import 'package:flutter/material.dart';
 
 extension TextTransforms on EditorState {
   /// Inserts a new line at the given position.
@@ -32,7 +33,7 @@ extension TextTransforms on EditorState {
     final children = node.children;
     final delta = node.delta;
 
-    if (delta != null) {
+    if (delta != null && !node.isMediaType()) {
       // Delete the text after the cursor in the current node.
       transaction.deleteText(
         node,
@@ -47,6 +48,7 @@ extension TextTransforms on EditorState {
     }
 
     final slicedDelta = delta == null ? Delta() : delta.slice(position.offset);
+
     final Map<String, dynamic> attributes = {
       'delta': slicedDelta.toJson(),
     };
@@ -59,10 +61,24 @@ extension TextTransforms on EditorState {
     }
 
     final insertedNode = paragraphNode(
-      attributes: attributes,
+      attributes: node.isMediaType() ? null : attributes,
       children: children,
     );
-    nodeBuilder ??= (node) => node.copyWith();
+
+    bool isNewHeading = false;
+    nodeBuilder ??= (insertNode) {
+      if (node.type == 'heading') {
+        if (insertNode.delta?.toPlainText().isEmpty == true) {
+          return insertNode.copyWith();
+        }
+        int level = node.attributes['level'] as int;
+        Attributes srcAttributes = insertNode.attributes;
+        srcAttributes['level'] = level;
+        isNewHeading = true;
+        return insertNode.copyWith(type: node.type, attributes: srcAttributes);
+      }
+      return insertNode.copyWith();
+    };
 
     // Insert a new paragraph node.
     transaction.insertNode(
@@ -78,9 +94,47 @@ extension TextTransforms on EditorState {
         offset: 0,
       ),
     );
-
+    if (isNewHeading) {
+      headingChange = true;
+    }
     // Apply the transaction.
-    return apply(transaction);
+    return apply(transaction).then((value) {
+      if(node.type != "heading" && delta != null && delta.operations.isNotEmpty){
+        Attributes? last;
+        try{
+          //获取当前光标所在的操作对象
+          last = getOffsetAtOperationIndex(position!.offset,delta.operations).attributes;
+        }
+        catch(e){
+          last = delta.operations.last.attributes;
+        }
+       
+        formatDelta(
+          Selection.collapsed(
+            Position(
+              path: next,
+              offset: 0,
+            ),
+          ),
+          {
+            ...?last,
+          },
+        );
+      }
+    });
+  }
+
+  TextInsert getOffsetAtOperationIndex(int index, List<TextOperation> ops) {
+    int currentIndex = 0;
+
+    for (var op in ops.map((e) => e as TextInsert)) {
+      if (index >= currentIndex && index < currentIndex + op.text.length) {
+        return op;
+      }
+      currentIndex += op.length;
+    }
+
+    throw RangeError('Index out of bounds');
   }
 
   /// Inserts text at the given position.
@@ -141,6 +195,20 @@ extension TextTransforms on EditorState {
     selection = selection?.normalized;
 
     if (selection == null || selection.isCollapsed) {
+      if (selection != null) {
+        final nodes = getNodesInSelection(selection);
+        if (nodes.isEmpty) {
+          return;
+        }
+        Node node = nodes.last;
+        if (node.toggleAttributes == null) {
+          node.toggleAttributes = {'position': selection, ...attributes};
+        } else {
+          node.toggleAttributes!.addAll({'position': selection});
+          node.toggleAttributes!.addAll(attributes);
+        }
+        this.selection = selection;
+      }
       return;
     }
 
@@ -153,7 +221,17 @@ extension TextTransforms on EditorState {
 
     for (final node in nodes) {
       final delta = node.delta;
-      if (delta == null) {
+      if (delta == null || delta.isEmpty) {
+        Selection emptySelection = Selection(
+          start: Position(path: node.path),
+          end: Position(path: node.path),
+        );
+        if (node.toggleAttributes == null) {
+          node.toggleAttributes = {'position': emptySelection, ...attributes};
+        } else {
+          node.toggleAttributes!.addAll({'position': emptySelection});
+          node.toggleAttributes!.addAll(attributes);
+        }
         continue;
       }
       final startIndex = node == nodes.first ? selection.startIndex : 0;
@@ -232,6 +310,154 @@ extension TextTransforms on EditorState {
         ..afterSelection = transaction.beforeSelection;
     }
 
+    // 如果是标题增加或者移除，要通知外层
+    for (var element in transaction.operations) {
+      if (element is InsertOperation || element is DeleteOperation) {
+        Iterable<Node> nodes;
+        if (element is InsertOperation) {
+          nodes = element.nodes;
+        } else {
+          nodes = (element as DeleteOperation).nodes;
+        }
+        bool isFind = false;
+        for (final node in nodes) {
+          if (node.type == HeadingBlockKeys.type) {
+            headingChange = true;
+            isFind = true;
+            break;
+          }
+        }
+        if (isFind) {
+          break;
+        }
+      }
+    }
+    return apply(transaction);
+  }
+
+  /// 设置给的定范围对应的Node的整体属性，包含block属性和文本属性
+  Future<void> formatSelectedNode(
+    Selection? selection,
+    Attributes attributes,
+    Node Function(
+      Node node,
+    ) nodeBuilder, {
+    bool isClearFormat = false,
+  }) async {
+    selection ??= this.selection;
+    selection = selection?.normalized;
+
+    if (selection == null) {
+      return;
+    }
+
+    final nodes = getNodesInSelection(selection).where((element) => !element.isMediaType()).toList();
+    if (nodes.isEmpty) {
+      return;
+    }
+
+    final transaction = this.transaction;
+
+    for (var i = 0; i < nodes.length; i++) {
+      final node = nodes[i];
+      Node newNode = nodeBuilder(node);
+
+      transaction
+        ..deleteNode(node)
+        ..insertNode(
+          node.path,
+          newNode,
+          transform: false,
+        )
+        ..afterSelection = transaction.beforeSelection;
+
+      final delta = node.delta;
+      newNode.path;
+      if (delta == null) {
+        continue;
+      }
+      if (!isClearFormat) {
+        // transaction
+        //   ..formatText(
+        //     node,
+        //     0,
+        //     delta.length,
+        //     attributes,
+        //   )
+        //   ..afterSelection = transaction.beforeSelection;
+      } else {
+        if (i == 0) {
+          if (nodes.length == 1) {
+            transaction
+              ..customFormatText(
+                newNode,
+                selection.startIndex,
+                selection.endIndex - selection.startIndex,
+                attributes,
+                node.path,
+                transform: false,
+              )
+              ..afterSelection = transaction.beforeSelection;
+          } else {
+            transaction
+              ..customFormatText(
+                newNode,
+                selection.startIndex,
+                delta.length - selection.startIndex,
+                attributes,
+                node.path,
+                transform: false,
+              )
+              ..afterSelection = transaction.beforeSelection;
+          }
+        } else if (i == nodes.length - 1) {
+          transaction
+            ..customFormatText(
+              newNode,
+              0,
+              selection.endIndex,
+              attributes,
+              node.path,
+              transform: false,
+            )
+            ..afterSelection = transaction.beforeSelection;
+        } else {
+          transaction
+            ..customFormatText(
+              newNode,
+              0,
+              delta.toPlainText().length,
+              attributes,
+              node.path,
+              transform: false,
+            )
+            ..afterSelection = transaction.beforeSelection;
+        }
+      }
+    }
+
+    // 如果是标题增加或者移除，要通知外层
+    for (var element in transaction.operations) {
+      if (element is InsertOperation || element is DeleteOperation) {
+        Iterable<Node> nodes;
+        if (element is InsertOperation) {
+          nodes = element.nodes;
+        } else {
+          nodes = (element as DeleteOperation).nodes;
+        }
+        bool isFind = false;
+        for (final node in nodes) {
+          if (node.type == HeadingBlockKeys.type) {
+            headingChange = true;
+            isFind = true;
+            break;
+          }
+        }
+        if (isFind) {
+          break;
+        }
+      }
+    }
     return apply(transaction);
   }
 

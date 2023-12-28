@@ -152,6 +152,7 @@ class Delta extends Iterable<TextOperation> {
   }
 
   final List<TextOperation> _operations;
+  List<TextOperation> get operations => _operations;
   String? _plainText;
 
   void addAll(Iterable<TextOperation> textOperations) {
@@ -520,8 +521,13 @@ class Delta extends Iterable<TextOperation> {
     if (index <= 0) {
       return null;
     }
-
-    final attributes = slice(index - 1, index).first.attributes;
+    int begin = index - 1;
+    int end = index;
+    if (index == 0) {
+      begin = 0;
+      end = 1;
+    }
+    final attributes = slice(begin, end).first.attributes;
     if (attributes == null ||
         !attributes.keys.every(
           (element) => AppFlowyRichTextKeys.supportSliced.contains(element),

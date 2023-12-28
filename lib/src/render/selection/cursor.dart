@@ -87,7 +87,7 @@ class CursorState extends State<Cursor> {
         return Container(
           width: size.width,
           height: size.height,
-          color: color.withOpacity(0.2),
+          color: (color == Colors.transparent && !widget.shouldBlink) ? color : color.withOpacity(0.2),
         );
     }
   }

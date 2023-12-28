@@ -1,5 +1,9 @@
+import 'dart:math';
+
 import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:flutter/material.dart';
+
+final Map<Object, RenderBox> _cachedRenderBoxes = {};
 
 extension NodeExtensions on Node {
   RenderBox? get renderBox =>
@@ -140,6 +144,66 @@ extension NodeExtensions on Node {
     final parent = this.parent;
     return parent?.findParent(test);
   }
+
+  Delta? getDeltaInSelection(Selection selection) {
+    if (selection.isCollapsed) {
+      return null;
+    }
+
+    selection = selection.normalized;
+
+    var delta = this.delta;
+    if (delta == null) {
+      return null;
+    }
+
+    delta = delta.slice(selection.startIndex, selection.endIndex);
+
+    return delta;
+  }
+
+  EdgeInsets getNodeEdgeInsets() {
+    double preParagraph = 0.0;
+    double afterParagraph = 0.0;
+    int indent = 0;
+
+    if (attributes[blockIndent] is int) {
+      indent = attributes[blockIndent];
+    }
+    if (attributes[blockPreParagraph] is double) {
+      preParagraph = attributes[blockPreParagraph];
+    }
+    if (attributes[blockAfterParagraph] is double) {
+      afterParagraph = attributes[blockAfterParagraph];
+    }
+
+    return EdgeInsets.only(
+      left: indent * 20.0,
+      top: preParagraph,
+      bottom: afterParagraph,
+    );
+  }
+
+  double getCurNodeMaxFontSize() {
+    double maxFontSize = 16;
+
+    final textInserts = delta!.whereType<TextInsert>();
+    int firstIndex = 0;
+    for (final textInsert in textInserts) {
+      final attributes = textInsert.attributes;
+      if (attributes != null) {
+        if (attributes.fontSize != null) {
+          if (firstIndex == 0) {
+            maxFontSize = attributes.fontSize!;
+            firstIndex = 1;
+          } else {
+            maxFontSize = max(maxFontSize, attributes.fontSize!);
+          }
+        }
+      }
+    }
+    return maxFontSize;
+  }
 }
 
 extension NodesExtensions<T extends Node> on List<T> {
@@ -188,5 +252,86 @@ extension NodesExtensions<T extends Node> on List<T> {
     }
 
     return true;
+  }
+
+  Delta? getDeltaInSelection(Selection selection) {
+    if (selection.isCollapsed) {
+      return _getCurPositionDelta(selection);
+    }
+
+    selection = selection.normalized;
+    final nodes = this.normalized;
+
+    if (nodes.length == 1) {
+      return nodes.first.getDeltaInSelection(selection);
+    }
+
+    Delta? delta;
+    for (var i = 0; i < nodes.length; i++) {
+      final node = nodes[i];
+      delta = node.delta;
+      if (delta == null) {
+        continue;
+      }
+
+      if (i == 0) {
+        delta = delta.slice(selection.start.offset);
+      } else if (i == nodes.length - 1) {
+        delta = delta.slice(0, selection.end.offset);
+      }
+    }
+    return delta;
+  }
+
+  /// 只有光标时获取到的属性
+  Delta? _getCurPositionDelta(Selection selection) {
+    selection = selection.normalized;
+    final nodes = this.normalized;
+    if (nodes.isNotEmpty) {
+      final node = this.normalized.first;
+      Delta? delta = node.delta;
+      if (delta == null) {
+        return null;
+      }
+      if (selection.start.offset == 0) {
+        delta = delta.slice(0, 1);
+      } else if (selection.start.offset == delta.length - 1) {
+        delta = delta.slice(selection.start.offset - 1, selection.start.offset);
+      } else {
+        // delta = delta.slice(selection.start.offset, selection.start.offset + 1);
+        delta = delta.slice(selection.start.offset - 1, selection.start.offset);
+      }
+      if (node.toggleAttributes != null) {
+        if (node.toggleAttributes!.isNotEmpty) {
+          Selection toggleSelection = node.toggleAttributes!['position'];
+          if (toggleSelection == selection) {
+            List<TextOperation> operations = delta.operations;
+            if (operations.isNotEmpty) {
+              TextOperation firstOperation = operations.first;
+              if (firstOperation is TextInsert) {
+                final jsons = delta.toJson();
+                Map firstMap = jsons.first;
+                if (firstMap['attributes'] == null) {
+                  firstMap['attributes'] = node.toggleAttributes;
+                } else {
+                  firstMap['attributes'].addAll(node.toggleAttributes!);
+                }
+                delta = Delta.fromJson(jsons);
+              }
+            } else {
+              Selection toggleSelection = node.toggleAttributes!['position'];
+              if (toggleSelection == selection) {
+                delta = Delta.fromJson([
+                  {'insert': '', 'attributes': node.toggleAttributes}
+                ]);
+                return delta;
+              }
+            }
+          }
+        }
+      }
+      return delta;
+    }
+    return null;
   }
 }

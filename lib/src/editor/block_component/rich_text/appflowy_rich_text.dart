@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 
+import 'package:appflowy_editor/appflowy_editor.dart';
 import 'package:appflowy_editor/src/core/document/attributes.dart';
 import 'package:appflowy_editor/src/core/document/node.dart';
 import 'package:appflowy_editor/src/core/document/path.dart';
@@ -13,8 +14,10 @@ import 'package:appflowy_editor/src/editor/util/color_util.dart';
 import 'package:appflowy_editor/src/editor_state.dart';
 import 'package:appflowy_editor/src/extensions/text_style_extension.dart';
 import 'package:appflowy_editor/src/render/selection/selectable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:tuple/tuple.dart';
 
 typedef TextSpanDecoratorForAttribute = InlineSpan Function(
   BuildContext context,
@@ -37,7 +40,7 @@ class AppFlowyRichText extends StatefulWidget {
     this.placeholderTextSpanDecorator,
     this.textDirection = TextDirection.ltr,
     this.textSpanDecoratorForCustomAttributes,
-    this.textAlign,
+    required this.textAlign,
     this.cursorColor = const Color.fromARGB(255, 0, 0, 0),
     this.selectionColor = const Color.fromARGB(53, 111, 201, 231),
     required this.delegate,
@@ -71,8 +74,6 @@ class AppFlowyRichText extends StatefulWidget {
   /// customize the text span for placeholder text
   final AppFlowyTextSpanDecorator? placeholderTextSpanDecorator;
 
-  final TextAlign? textAlign;
-
   // get the cursor rect, selection rects or block rect from the delegate
   final SelectableMixin delegate;
 
@@ -82,6 +83,9 @@ class AppFlowyRichText extends StatefulWidget {
   ///   or override the existing one.
   final TextSpanDecoratorForAttribute? textSpanDecoratorForCustomAttributes;
   final TextDirection textDirection;
+
+  /// TextAlign
+  final TextAlign textAlign;
 
   final Color cursorColor;
   final Color selectionColor;
@@ -105,11 +109,43 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       widget.textSpanDecoratorForCustomAttributes ??
       widget.editorState.editorStyle.textSpanDecorator;
 
+  double? _lineHeight;
+
+  @override
+  void initState() {
+    if (widget.lineHeight != null) {
+      _lineHeight = widget.lineHeight;
+    } else {
+      if (widget.node.attributes.containsKey(blockComponentTextHeight)) {
+        _lineHeight = double.parse(
+          widget.node.attributes[blockComponentTextHeight].toString(),
+        );
+      } else {
+        _lineHeight = 1.5;
+      }
+    }
+    super.initState();
+  }
+
+  @override
+  void didUpdateWidget(covariant AppFlowyRichText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lineHeight != null) {
+      _lineHeight = widget.lineHeight;
+    } else {
+      if (widget.node.attributes.containsKey(blockComponentTextHeight)) {
+        _lineHeight = double.parse(
+          widget.node.attributes[blockComponentTextHeight].toString(),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final child = MouseRegion(
       cursor: SystemMouseCursors.text,
-      child: widget.node.delta?.toPlainText().isEmpty ?? true
+      child: isCoverAll && (widget.node.delta?.toPlainText().isEmpty ?? true)
           ? Stack(
               children: [
                 _buildPlaceholderText(context),
@@ -183,7 +219,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       max(0, cursorOffset.dx - (widget.cursorWidth / 2.0)),
       cursorOffset.dy,
       widget.cursorWidth,
-      cursorHeight ?? 16.0,
+      cursorHeight ?? 16.0 * 1.5,
     );
     return rect;
   }
@@ -277,29 +313,34 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     return RichText(
       key: placeholderTextKey,
       textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
+        applyHeightToFirstAscent: true,
+        applyHeightToLastDescent: true,
       ),
       text: widget.placeholderTextSpanDecorator != null
           ? widget.placeholderTextSpanDecorator!(textSpan)
           : textSpan,
       textDirection: textDirection(),
+      textAlign: widget.textAlign,
     );
   }
 
   Widget _buildRichText(BuildContext context) {
     final textSpan = getTextSpan();
+    Tuple2 tuple2 = widget.editorState.getCurNodeMaxFontSize(widget.node);
     return RichText(
       key: textKey,
-      textAlign: widget.textAlign ?? TextAlign.start,
       textHeightBehavior: const TextHeightBehavior(
-        applyHeightToFirstAscent: false,
-        applyHeightToLastDescent: false,
+        applyHeightToFirstAscent: true,
+        applyHeightToLastDescent: true,
       ),
       text: widget.textSpanDecorator != null
           ? widget.textSpanDecorator!(textSpan)
           : textSpan,
       textDirection: textDirection(),
+      textAlign: widget.textAlign,
+      strutStyle: StrutStyle.fromTextStyle(
+        textSpan.style!.copyWith(fontSize: tuple2.item2),
+      ),
     );
   }
 
@@ -309,7 +350,7 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
       children: [
         TextSpan(
           text: widget.placeholderText,
-          style: style.text.copyWith(height: widget.lineHeight),
+          style: style.text.copyWith(height: _lineHeight),
         ),
       ],
     );
@@ -321,8 +362,12 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
     final style = widget.editorState.editorStyle.textStyleConfiguration;
     final textInserts = widget.node.delta!.whereType<TextInsert>();
     for (final textInsert in textInserts) {
-      TextStyle textStyle = style.text.copyWith(height: widget.lineHeight);
+      TextStyle textStyle = style.text.copyWith(height: _lineHeight);
       final attributes = textInsert.attributes;
+
+      /// 上下标
+      bool isSuperScript = false;
+      bool isSubScript = false;
       if (attributes != null) {
         if (attributes.bold == true) {
           textStyle = textStyle.combine(style.bold);
@@ -357,37 +402,188 @@ class _AppFlowyRichTextState extends State<AppFlowyRichText>
             TextStyle(color: attributes.color),
           );
         }
-        if (attributes.fontFamily != null) {
-          textStyle = textStyle.combine(
-            TextStyle(fontFamily: attributes.fontFamily),
-          );
-        }
+
+        /// fontSize by 533335
         if (attributes.fontSize != null) {
           textStyle = textStyle.combine(
             TextStyle(fontSize: attributes.fontSize),
           );
         }
-      }
-      final textSpan = TextSpan(
-        text: textInsert.text,
-        style: textStyle,
-      );
-      textSpans.add(
-        textSpanDecoratorForAttribute != null
-            ? textSpanDecoratorForAttribute!(
-                context,
+
+        /// fontFamily by 533335
+        if (attributes.fontFamily != null) {
+          if (kIsWeb || PlatformExtension.isMobile) {
+            List<String> listFamily = [];
+            if (widget.editorState.onSupportDisplayFamily != null) {
+              listFamily = widget.editorState.onSupportDisplayFamily!(
+                attributes.fontFamily,
+                textInsert.text,
                 widget.node,
-                offset,
-                textInsert,
-                textSpan,
-              )
-            : textSpan,
-      );
+              );
+            }
+
+            if (listFamily.isEmpty) {
+              listFamily.addAll(defaultFontFamilyFallback);
+            }
+            textStyle = textStyle.combine(
+              TextStyle(
+                fontFamily: listFamily.last,
+                fontFamilyFallback: listFamily + defaultFontFamilyFallback,
+              ),
+            );
+          } else {
+            textStyle = textStyle.combine(
+              TextStyle(
+                fontFamily: attributes.fontFamily,
+                fontFamilyFallback: defaultFontFamilyFallback,
+              ),
+            );
+          }
+        } else {
+          textStyle = textStyle.combine(
+            TextStyle(
+              fontFamily: defaultFontFamilyFallback.last,
+              fontFamilyFallback: defaultFontFamilyFallback,
+            ),
+          );
+        }
+
+        /// 上下标
+        isSuperScript = attributes.superScript;
+        isSubScript = attributes.subScript;
+      } else {
+        textStyle = textStyle.combine(
+          TextStyle(
+            fontFamily: defaultFontFamilyFallback.last,
+            fontFamilyFallback: defaultFontFamilyFallback,
+          ),
+        );
+      }
+      if (isSuperScript || isSubScript) {
+        double fontSize = textStyle.fontSize ?? 16.0;
+        double offset = isSuperScript ? (fontSize / 3 * -1) : fontSize / 3;
+        textStyle = textStyle.combine(
+          TextStyle(
+            fontSize: max(3, fontSize / 1.5),
+          ),
+        );
+
+        textInsert.text.split("").forEach((text) {
+          _addSuperScriptText(
+            textSpans,
+            offset,
+            text,
+            textStyle,
+            attributes?.underline == true,
+            attributes?.strikethrough == true,
+          );
+        });
+      } else {
+        if(textInsert.text.contains('\t')){
+          var tabs = _splitStringWithTabs(textInsert.text);
+          var list = tabs.map((e) => e == '\t' ? WidgetSpan(
+            child: Container(
+              width: (textStyle.fontSize ?? 16) * 2,
+              height: 1,
+              color: Colors.transparent,
+            ),
+          ) : TextSpan(
+            text: e,
+            style: textStyle,
+          )).toList();
+          for (var element in list) {
+            textSpans.add(element);
+          }
+        } else {
+          textSpans.add(
+            TextSpan(
+              text: textInsert.text,
+              style: textStyle,
+            ),
+          );
+        }
+      }
+      // textSpans.add(
+      //   textSpanDecoratorForAttribute != null
+      //       ? textSpanDecoratorForAttribute!(
+      //           context,
+      //           widget.node,
+      //           offset,
+      //           textInsert,
+      //           textSpan,
+      //         )
+      //       : textSpan,
+      // );
       offset += textInsert.length;
     }
     return TextSpan(
       children: textSpans,
+      style: TextStyle(height: _lineHeight),
     );
+  }
+
+  List<String> _splitStringWithTabs(String input) {
+    RegExp exp = RegExp(r'(\\t|.)');
+    Iterable<RegExpMatch> matches = exp.allMatches(input);
+    List<String> result = matches.map((match) => match.group(0)!).toList();
+    return result;
+  }
+
+  Size _measureCharacterWidth(String character, TextStyle textStyle) {
+    final TextPainter textPainter = TextPainter(
+      text: TextSpan(text: character, style: textStyle),
+      textDirection: TextDirection.ltr,
+      textScaleFactor: WidgetsBinding.instance.window.textScaleFactor,
+    )..layout();
+
+    return textPainter.size;
+  }
+
+  /// 多个上下标文本拆分成单个加入到textSpans中
+  void _addSuperScriptText(
+    List<InlineSpan> textSpans,
+    double offsetY,
+    String text,
+    TextStyle textStyle,
+    bool isUnderLine,
+    bool isStrikethrough,
+  ) {
+    double curFontSize = textStyle.fontSize ?? 16;
+    textSpans.add(WidgetSpan(
+      baseline: TextBaseline.ideographic,
+      alignment: PlaceholderAlignment.aboveBaseline,
+      child: Transform.translate(
+        offset: Offset(0, offsetY),
+        child: Stack(
+          children: [
+            Text(
+              text,
+              style: textStyle.copyWith(decoration: TextDecoration.none),
+            ),
+
+            // 下划线和删除上下标时样式有问题，需要加上
+            if (isUnderLine)
+              Positioned(
+                bottom: curFontSize * 0.2,
+                child: Container(
+                  height: 1,
+                  width: curFontSize * 1.1,
+                  color: textStyle.color,
+                ),
+              ),
+            if (isStrikethrough)
+              Positioned(
+                bottom: curFontSize * 0.8,
+                child: Container(
+                  height: 1,
+                  width: curFontSize * 1.1,
+                  color: textStyle.color,
+                ),
+              )
+          ],
+        ),
+      ),
+    ));
   }
 
   TextSelection? textSelectionFromEditorSelection(Selection? selection) {
@@ -488,9 +684,12 @@ extension AppFlowyRichTextAttributes on Attributes {
   }
 
   double? get fontSize {
-    if (this[AppFlowyRichTextKeys.fontSize] is double) {
-      return this[AppFlowyRichTextKeys.fontSize];
+    if (containsKey(AppFlowyRichTextKeys.fontSize)) {
+      return double.parse(this[AppFlowyRichTextKeys.fontSize].toString());
     }
     return null;
   }
+
+  bool get superScript => this[AppFlowyRichTextKeys.superScript] == true;
+  bool get subScript => this[AppFlowyRichTextKeys.subScript] == true;
 }

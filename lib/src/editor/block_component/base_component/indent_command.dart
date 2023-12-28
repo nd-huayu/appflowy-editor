@@ -20,7 +20,8 @@ final CommandShortcutEvent indentCommand = CommandShortcutEvent(
   handler: _indentCommandHandler,
 );
 
-CommandShortcutEventHandler _indentCommandHandler = (editorState) {
+// 响应缩进的tab事件
+CommandShortcutEventHandler _indentDefaultCommandHandler = (editorState) {
   final selection = editorState.selection;
   if (selection == null || !selection.isCollapsed) {
     return KeyEventResult.ignored;
@@ -44,5 +45,29 @@ CommandShortcutEventHandler _indentCommandHandler = (editorState) {
     ..afterSelection = afterSelection;
   editorState.apply(transaction);
 
+  return KeyEventResult.handled;
+};
+
+// 响应插入tab字符事件
+CommandShortcutEventHandler _indentCommandHandler = (editorState) {
+  final selection = editorState.selection;
+  if (selection == null || !selection.isCollapsed) {
+    return KeyEventResult.ignored;
+  }
+  final node = editorState.getNodeAtPath(selection.end.path);
+  final delta = node?.delta;
+  if (node == null || delta == null) {
+    return KeyEventResult.ignored;
+  }
+
+  // if(delta.operations.first is TextInsert && (delta.operations.first as TextInsert).text.startsWith('\t')){
+  //   return _indentDefaultCommandHandler(editorState);
+  // }
+  // else{
+  //   editorState.insertTextAtCurrentSelection('\t');
+  //   return KeyEventResult.handled;
+  // }
+
+  editorState.insertTextAtCurrentSelection('\t');
   return KeyEventResult.handled;
 };

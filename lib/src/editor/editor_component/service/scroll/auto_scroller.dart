@@ -31,6 +31,7 @@ class AutoScroller extends EdgeDraggingAutoScroller
     AxisDirection? direction,
     Duration? duration,
   }) {
+    duration = Duration.zero; // fyl: 屏蔽动画调整，避免内容过多时按上下键盘时出现卡顿
     if (direction != null && direction == AxisDirection.up) {
       return startAutoScrollIfNecessary(
         offset & Size(1, edgeOffset),

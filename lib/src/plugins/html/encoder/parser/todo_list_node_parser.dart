@@ -34,8 +34,11 @@ class HTMLTodoListNodeParser extends HTMLNodeParser {
       processChildrenNodes(node.children, encodeParsers: encodeParsers),
     );
 
-    final element =
-        wrapChildrenNodesWithTagName(HTMLTags.div, childNodes: domNodes);
+    final element = wrapChildrenNodesWithTagName(
+      HTMLTags.div,
+      childNodes: domNodes,
+      attributes: node.attributes,
+    );
     return [element];
   }
 }

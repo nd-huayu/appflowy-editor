@@ -10,6 +10,8 @@ class AppFlowyRichTextKeys {
   static String href = 'href';
   static String fontFamily = 'font_family';
   static String fontSize = 'font_size';
+  static String superScript = 'super_script';
+  static String subScript = 'sub_script';
 
   static List<String> supportSliced = [
     bold,
@@ -18,5 +20,9 @@ class AppFlowyRichTextKeys {
     strikethrough,
     textColor,
     highlightColor,
+    fontSize,
+    fontFamily,
+    superScript,
+    subScript
   ];
 }
